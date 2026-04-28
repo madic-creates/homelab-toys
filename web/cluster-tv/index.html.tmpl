@@ -64,16 +64,19 @@
 
 <script>
 (function(){
+  const VALID_THEMES = ['crt', 'modern'];
   const params = new URLSearchParams(location.search);
-  if (params.has('theme')) {
-    localStorage.setItem('clustertv-theme', params.get('theme'));
-  } else {
+  const requested = params.get('theme');
+  if (requested && VALID_THEMES.includes(requested)) {
+    localStorage.setItem('clustertv-theme', requested);
+  } else if (!params.has('theme')) {
     const stored = localStorage.getItem('clustertv-theme');
-    if (stored && stored !== document.documentElement.dataset.theme) {
+    if (stored && VALID_THEMES.includes(stored) && stored !== document.documentElement.dataset.theme) {
       location.search = '?theme=' + encodeURIComponent(stored);
       return;
     }
   }
+  // else: ?theme= present but invalid → fall through, rely on server's default-CRT behavior
   async function tick(){
     try {
       const html = await fetch(location.href, {cache:'no-store'}).then(r => r.text());
