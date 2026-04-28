@@ -16,9 +16,8 @@ cert-manager expiry, and pod restart counts. A second binary,
 **tamagotchi**, is specced (`docs/superpowers/specs/`) but not yet
 implemented.
 
-Kubernetes manifests do **not** live here. They live in a sibling repo at
-`/home/mne-adm/Git/personal/github.com/k3s-git-ops/apps/<tool>/` and are
-deployed via ArgoCD. Renovate pins the image digest there after each release.
+`deploy/<tool>/` holds reference Kubernetes manifests for deploying a tool,
+with `docs/<tool>-deployment.md` as the narrative companion.
 
 ## Commands
 
@@ -128,7 +127,7 @@ defensive pattern; new clients should match it:
 | The TDD task breakdown that produced cluster-tv | `docs/superpowers/plans/2026-04-28-cluster-tv.md` |
 | The release pipeline | `docs/renovate.md`, `docs/cleanup-ghcr.md`, `docs/pre-commit.md` |
 | Reference patterns for new binaries | sibling repo `claude-alert-analyzer` (different problem domain, same shape: scratch Dockerfile, multi-binary CI matrix, pre-commit + renovate config) |
-| Where a tool actually runs | sibling repo `k3s-git-ops` under `apps/<tool>/` |
+| How to deploy a tool | `docs/<tool>-deployment.md` + `deploy/<tool>/` |
 
 ## Conventional Commits + commit hygiene
 
