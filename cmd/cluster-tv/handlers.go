@@ -26,6 +26,12 @@ type Handlers struct {
 	now          func() time.Time
 	processStart time.Time
 
+	// CSS payloads injected into the template per request based on the
+	// requested theme. template.CSS marks the string as already-safe so the
+	// html/template package doesn't escape it.
+	cssCRT    template.CSS
+	cssModern template.CSS
+
 	// metrics
 	pollTotal       *prometheus.CounterVec
 	lastSuccessSecs *prometheus.GaugeVec
@@ -50,6 +56,15 @@ func NewHandlers(s *State, tpl *template.Template, now func() time.Time) *Handle
 			prometheus.HistogramOpts{Name: "cluster_tv_render_duration_seconds"},
 		),
 	}
+}
+
+// SetCSS installs the per-theme CSS strings injected into the index
+// template. Wired up from cmd/cluster-tv/main.go using the assets in the
+// web/cluster-tv embed.FS — kept off the constructor so handler tests can
+// run with a stand-in template that doesn't reference {{.CSS}}.
+func (h *Handlers) SetCSS(crt, modern string) {
+	h.cssCRT = template.CSS(crt)
+	h.cssModern = template.CSS(modern)
 }
 
 // Register registers metric collectors with the given registry. Tests can
@@ -118,6 +133,7 @@ func (h *Handlers) HandleHealthz(w http.ResponseWriter, _ *http.Request) {
 
 type indexData struct {
 	Theme    string
+	CSS      template.CSS
 	S        Snapshot
 	AllGreen bool
 	Stale    int
@@ -133,8 +149,13 @@ func (h *Handlers) HandleIndex(w http.ResponseWriter, r *http.Request) {
 		theme = "crt" // default + fallback for invalid values
 	}
 
+	css := h.cssCRT
+	if theme == "modern" {
+		css = h.cssModern
+	}
 	data := indexData{
 		Theme:    theme,
+		CSS:      css,
 		S:        h.state.Snapshot(),
 		AllGreen: h.state.AllGreen(now),
 		Stale:    h.state.StaleCount(now),

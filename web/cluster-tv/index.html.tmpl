@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en" data-theme="{{.Theme}}">
+<head>
+<meta charset="utf-8">
+<title>cluster-tv</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<style>{{.CSS}}</style>
+</head>
+<body>
+<header>
+  <h1>cluster-tv</h1>
+  <nav>
+    <a href="?theme=crt"  class="theme-link" data-theme-target="crt">CRT</a>
+    <a href="?theme=modern" class="theme-link" data-theme-target="modern">MODERN</a>
+  </nav>
+</header>
+
+{{if .AllGreen}}
+<section id="ok-banner" class="banner ok">
+  <h2>CLUSTER OK</h2>
+  <p>All signals nominal · {{.Now.Format "15:04:05 MST"}}</p>
+</section>
+{{else}}
+<main id="grid" class="grid">
+  <section class="tile" data-source="argocd">
+    <h2>ArgoCD{{if .S.ArgoCD.LastError}} <span class="warn" title="{{.S.ArgoCD.LastError}}">⚠</span>{{end}}</h2>
+    <div class="counts">
+      <span class="ok">{{.S.ArgoCD.Data.Healthy}} healthy</span>
+      <span class="bad">{{.S.ArgoCD.Data.Degraded}} degraded</span>
+      <span class="bad">{{.S.ArgoCD.Data.OutOfSync}} out-of-sync</span>
+    </div>
+    {{if .S.ArgoCD.Data.Bad}}<ul class="badlist">{{range .S.ArgoCD.Data.Bad}}<li>{{.Name}} ({{.Sync}} / {{.Health}})</li>{{end}}</ul>{{end}}
+  </section>
+
+  <section class="tile" data-source="longhorn">
+    <h2>Longhorn{{if .S.Longhorn.LastError}} <span class="warn" title="{{.S.Longhorn.LastError}}">⚠</span>{{end}}</h2>
+    <div class="counts">
+      <span class="ok">{{.S.Longhorn.Data.Healthy}} healthy</span>
+      <span class="bad">{{.S.Longhorn.Data.Degraded}} degraded</span>
+      <span class="bad">{{.S.Longhorn.Data.Faulted}} faulted</span>
+    </div>
+  </section>
+
+  <section class="tile" data-source="certs">
+    <h2>Certs{{if .S.Certs.LastError}} <span class="warn" title="{{.S.Certs.LastError}}">⚠</span>{{end}}</h2>
+    <div class="counts">
+      <span class="{{if eq .S.Certs.Data.Total 0}}ok{{else}}bad{{end}}">{{.S.Certs.Data.Total}} expiring &lt; 30d</span>
+    </div>
+    {{if .S.Certs.Data.Expiring}}<ul class="badlist">{{range .S.Certs.Data.Expiring}}<li>{{.Namespace}}/{{.Name}} · {{.NotAfter}}</li>{{end}}</ul>{{end}}
+  </section>
+
+  <section class="tile" data-source="restarts">
+    <h2>Pod restarts{{if .S.Restarts.LastError}} <span class="warn" title="{{.S.Restarts.LastError}}">⚠</span>{{end}}</h2>
+    <div class="counts">
+      <span class="{{if eq .S.Restarts.Data.Total 0}}ok{{else}}bad{{end}}">{{.S.Restarts.Data.Total}} pods restarted &gt; 5× / 24h</span>
+    </div>
+    {{if .S.Restarts.Data.Pods}}<ul class="badlist">{{range .S.Restarts.Data.Pods}}<li>{{.Namespace}}/{{.Pod}}/{{.Container}} · {{.Restarts}}</li>{{end}}</ul>{{end}}
+  </section>
+</main>
+{{end}}
+
+{{if gt .Stale 0}}<footer class="stale-banner">{{.Stale}} source(s) stale</footer>{{end}}
+
+<script>
+(function(){
+  const params = new URLSearchParams(location.search);
+  if (params.has('theme')) {
+    localStorage.setItem('clustertv-theme', params.get('theme'));
+  } else {
+    const stored = localStorage.getItem('clustertv-theme');
+    if (stored && stored !== document.documentElement.dataset.theme) {
+      location.search = '?theme=' + encodeURIComponent(stored);
+      return;
+    }
+  }
+  async function tick(){
+    try {
+      const html = await fetch(location.href, {cache:'no-store'}).then(r => r.text());
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const oldBody = document.body;
+      const newBody = doc.body;
+      // Same banner-vs-grid? swap inner; else hard reload to avoid drift.
+      const wasOK = !!document.getElementById('ok-banner');
+      const isOK = !!doc.getElementById('ok-banner');
+      if (wasOK !== isOK) { location.reload(); return; }
+      oldBody.innerHTML = newBody.innerHTML;
+    } catch (_) {}
+  }
+  setInterval(tick, 30000);
+})();
+</script>
+</body>
+</html>

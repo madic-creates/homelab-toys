@@ -1,0 +1,57 @@
+:root {
+  --bg: #0f1115;
+  --fg: #e6e8ee;
+  --muted: #8a90a0;
+  --ok: #4ade80;
+  --bad: #f87171;
+  --warn: #fbbf24;
+  --tile-bg: #161a22;
+  font-family: -apple-system, system-ui, "Segoe UI", sans-serif;
+}
+
+html[data-theme="modern"] {
+  background: var(--bg);
+  color: var(--fg);
+}
+html[data-theme="modern"] body { margin: 0; padding: 1.5rem; min-height: 100vh; }
+html[data-theme="modern"] header {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 1.5rem;
+}
+html[data-theme="modern"] h1 { font-size: 1.5rem; margin: 0; font-weight: 600; }
+html[data-theme="modern"] nav a {
+  color: var(--muted); text-decoration: none; margin-left: 1rem;
+  font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.1em;
+}
+html[data-theme="modern"] nav a:hover { color: var(--fg); }
+
+html[data-theme="modern"] .grid {
+  display: grid; gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+html[data-theme="modern"] .tile {
+  background: var(--tile-bg);
+  border-radius: 8px; padding: 1rem;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset;
+}
+html[data-theme="modern"] .tile h2 { margin: 0 0 0.5rem; font-size: 1rem; font-weight: 600; color: var(--muted); }
+html[data-theme="modern"] .counts span { display: inline-block; margin-right: 1rem; font-variant-numeric: tabular-nums; }
+html[data-theme="modern"] .counts .ok { color: var(--ok); }
+html[data-theme="modern"] .counts .bad { color: var(--bad); }
+html[data-theme="modern"] .badlist { margin: 0.5rem 0 0; padding-left: 1rem; font-size: 0.85rem; color: var(--muted); }
+html[data-theme="modern"] .warn { color: var(--warn); }
+
+html[data-theme="modern"] .banner.ok {
+  text-align: center; padding: 5rem 1rem;
+  background: linear-gradient(180deg, rgba(74,222,128,0.08), transparent);
+  border-radius: 8px;
+}
+html[data-theme="modern"] .banner.ok h2 { font-size: 4rem; margin: 0; color: var(--ok); font-weight: 700; }
+html[data-theme="modern"] .banner.ok p { color: var(--muted); }
+
+html[data-theme="modern"] .stale-banner {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: var(--tile-bg);
+  color: var(--warn); text-align: center;
+  padding: 0.5rem; border-top: 1px solid rgba(251,191,36,0.3);
+}

@@ -1,0 +1,77 @@
+:root {
+  --bg: #001000;
+  --fg: #2bff2b;
+  --bg-glow: #003800;
+  --bad: #ff6b3d;
+  --warn: #ffe14a;
+  --tile-bg: rgba(0, 32, 0, 0.6);
+  font-family: "VT323", "Courier New", monospace;
+}
+
+html[data-theme="crt"] {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+html[data-theme="crt"] body {
+  margin: 0;
+  padding: 1.5rem;
+  min-height: 100vh;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(0,0,0,0) 0,
+      rgba(0,0,0,0) 2px,
+      rgba(0,0,0,0.25) 2px,
+      rgba(0,0,0,0.25) 3px
+    ),
+    radial-gradient(ellipse at center, var(--bg-glow) 0%, var(--bg) 80%);
+  text-shadow: 0 0 4px var(--fg), 0 0 12px rgba(43, 255, 43, 0.5);
+  letter-spacing: 0.05em;
+}
+
+html[data-theme="crt"] header {
+  display: flex; justify-content: space-between; align-items: baseline;
+  border-bottom: 1px solid var(--fg);
+  margin-bottom: 1.5rem; padding-bottom: 0.5rem;
+}
+
+html[data-theme="crt"] h1 { font-size: 2rem; margin: 0; letter-spacing: 0.2em; }
+html[data-theme="crt"] nav a { color: var(--fg); text-decoration: none; margin-left: 1rem; opacity: 0.7; }
+html[data-theme="crt"] nav a:hover { opacity: 1; }
+
+html[data-theme="crt"] .grid {
+  display: grid; gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+html[data-theme="crt"] .tile {
+  background: var(--tile-bg);
+  border: 1px solid var(--fg);
+  padding: 1rem;
+}
+
+html[data-theme="crt"] .tile h2 { margin: 0 0 0.5rem; font-size: 1.2rem; letter-spacing: 0.1em; }
+html[data-theme="crt"] .counts span { display: inline-block; margin-right: 1rem; }
+html[data-theme="crt"] .counts .bad { color: var(--bad); }
+html[data-theme="crt"] .counts .ok { color: var(--fg); }
+html[data-theme="crt"] .badlist { margin: 0.5rem 0 0; padding-left: 1rem; font-size: 0.9rem; }
+html[data-theme="crt"] .warn { color: var(--warn); }
+
+html[data-theme="crt"] .banner.ok {
+  text-align: center; padding: 4rem 1rem;
+  border: 2px solid var(--fg);
+  background: var(--tile-bg);
+}
+html[data-theme="crt"] .banner.ok h2 { font-size: 6rem; margin: 0; letter-spacing: 0.3em; }
+html[data-theme="crt"] .banner.ok p { opacity: 0.7; }
+
+html[data-theme="crt"] .stale-banner {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: rgba(255,225,74,0.15);
+  color: var(--warn);
+  text-align: center; padding: 0.5rem; border-top: 1px solid var(--warn);
+}
+
+@keyframes flicker { 0%,100%{opacity:1} 1%{opacity:0.94} 3%{opacity:0.97} }
+html[data-theme="crt"] body { animation: flicker 1.5s infinite; }
