@@ -57,10 +57,6 @@ func (c *Client) Query(ctx context.Context, q string) ([]Sample, error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("prom: status %d", resp.StatusCode)
-	}
-
 	var raw struct {
 		Status    string `json:"status"`
 		ErrorType string `json:"errorType,omitempty"`
@@ -73,10 +69,22 @@ func (c *Client) Query(ctx context.Context, q string) ([]Sample, error) {
 			} `json:"result"`
 		} `json:"data"`
 	}
+	// Decode whatever the server sent. Prometheus returns the same envelope
+	// for both success and error (e.g. 422 bad_data carries errorType+error
+	// in the body), so a single decode handles both paths.
 	if err := json.NewDecoder(io.LimitReader(resp.Body, maxResponseBytes)).Decode(&raw); err != nil {
+		// If the body was unparseable AND the status was non-OK, prefer to
+		// surface the status — the body is probably an HTML error page from
+		// a misconfigured proxy and not useful in the error.
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("prom: status %d", resp.StatusCode)
+		}
 		return nil, fmt.Errorf("prom: decode: %w", err)
 	}
 	if raw.Status != "success" {
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("prom: status %d: %s: %s", resp.StatusCode, raw.ErrorType, raw.Error)
+		}
 		return nil, fmt.Errorf("prom: %s: %s", raw.ErrorType, raw.Error)
 	}
 

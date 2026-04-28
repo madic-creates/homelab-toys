@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 )
 
@@ -87,5 +88,24 @@ func TestQuery_URLEncodes(t *testing.T) {
 	}
 	if parsed.Get("query") != `count by (state) (longhorn_volume_robustness == 1)` {
 		t.Errorf("query encoded as %q", parsed.Get("query"))
+	}
+}
+
+func TestQuery_PrometheusError_With4xxStatus(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		_, _ = w.Write([]byte(`{"status":"error","errorType":"bad_data","error":"parse error at char 5"}`))
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.URL, srv.Client())
+	_, err := c.Query(context.Background(), "broken{")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	for _, want := range []string{"422", "bad_data", "parse error at char 5"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not contain %q", err.Error(), want)
+		}
 	}
 }
