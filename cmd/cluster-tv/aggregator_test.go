@@ -77,7 +77,7 @@ func TestRunSource_FirstTickWritesState(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		runSource(ctx, "argocd", poll, 5*time.Millisecond)
+		runSource(ctx, "argocd", poll, 5*time.Millisecond, nil)
 		close(done)
 	}()
 
@@ -116,7 +116,7 @@ func TestRunSource_RecoversFromPanic(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		// Use a short backoff for the test.
-		runSourceWithBackoff(ctx, "test", poll, 5*time.Millisecond, 20*time.Millisecond)
+		runSourceWithBackoff(ctx, "test", poll, 5*time.Millisecond, 20*time.Millisecond, nil)
 		close(done)
 	}()
 
@@ -147,7 +147,7 @@ func TestRunSource_PollErrorKeepsRunning(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		runSource(ctx, "test", poll, 5*time.Millisecond)
+		runSource(ctx, "test", poll, 5*time.Millisecond, nil)
 		close(done)
 	}()
 

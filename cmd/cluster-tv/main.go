@@ -75,10 +75,10 @@ func run(parent context.Context) error {
 	ctx, cancel := signal.NotifyContext(parent, syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	go runSource(ctx, "argocd",   MakeArgoCDPoll(argoCli, state, now), tickInterval)
-	go runSource(ctx, "longhorn", MakeLonghornPoll(promCli, state, now), tickInterval)
-	go runSource(ctx, "restarts", MakeRestartsPoll(promCli, state, now), tickInterval)
-	go runSource(ctx, "certs",    MakeCertsPoll(certLister, certWindow, state, now), tickInterval)
+	go runSource(ctx, "argocd",   MakeArgoCDPoll(argoCli, state, now), tickInterval, handlers)
+	go runSource(ctx, "longhorn", MakeLonghornPoll(promCli, state, now), tickInterval, handlers)
+	go runSource(ctx, "restarts", MakeRestartsPoll(promCli, state, now), tickInterval, handlers)
+	go runSource(ctx, "certs",    MakeCertsPoll(certLister, certWindow, state, now), tickInterval, handlers)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", handlers.HandleIndex)

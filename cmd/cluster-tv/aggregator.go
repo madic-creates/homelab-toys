@@ -16,28 +16,36 @@ import (
 // and surfaced via the State's per-source LastError field.
 type pollFunc func(ctx context.Context) error
 
-const (
-	defaultTickInterval = 20 * time.Second
-	defaultBackoff      = 10 * time.Second
-)
+// metricsRecorder is what the aggregator needs from the metrics layer.
+// *Handlers in handlers.go satisfies this interface; the indirection lets
+// us unit-test runSource without pulling in the prometheus registry.
+type metricsRecorder interface {
+	PollTotal(source, result string)
+	LastSuccessSeconds(source string, seconds float64)
+}
+
+const defaultBackoff = 10 * time.Second
 
 // runSource is the production wrapper around runSourceWithBackoff, using
 // the spec's 10-second post-panic backoff.
-func runSource(ctx context.Context, name string, poll pollFunc, interval time.Duration) {
-	runSourceWithBackoff(ctx, name, poll, interval, defaultBackoff)
+func runSource(ctx context.Context, name string, poll pollFunc, interval time.Duration, m metricsRecorder) {
+	runSourceWithBackoff(ctx, name, poll, interval, defaultBackoff, m)
 }
 
 // runSourceWithBackoff is split out so tests can inject a short backoff.
-func runSourceWithBackoff(ctx context.Context, name string, poll pollFunc, interval, backoff time.Duration) {
+func runSourceWithBackoff(ctx context.Context, name string, poll pollFunc, interval, backoff time.Duration, m metricsRecorder) {
 	for ctx.Err() == nil {
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
 					slog.Error("source panic",
 						"source", name, "panic", fmt.Sprint(r))
+					if m != nil {
+						m.PollTotal(name, "panic")
+					}
 				}
 			}()
-			tickOnce(ctx, name, poll)
+			tickOnce(ctx, name, poll, m)
 			t := time.NewTicker(interval)
 			defer t.Stop()
 			for {
@@ -45,7 +53,7 @@ func runSourceWithBackoff(ctx context.Context, name string, poll pollFunc, inter
 				case <-ctx.Done():
 					return
 				case <-t.C:
-					tickOnce(ctx, name, poll)
+					tickOnce(ctx, name, poll, m)
 				}
 			}
 		}()
@@ -65,9 +73,20 @@ func runSourceWithBackoff(ctx context.Context, name string, poll pollFunc, inter
 	}
 }
 
-func tickOnce(ctx context.Context, name string, poll pollFunc) {
+func tickOnce(ctx context.Context, name string, poll pollFunc, m metricsRecorder) {
 	if err := poll(ctx); err != nil {
 		slog.Warn("source poll failed", "source", name, "error", err)
+		if m != nil {
+			m.PollTotal(name, "error")
+		}
+		return
+	}
+	if m != nil {
+		m.PollTotal(name, "success")
+		// Emit unix-seconds since epoch so Prometheus can compute
+		// `time() - cluster_tv_source_last_success_seconds` to get the
+		// freshness in seconds at query time.
+		m.LastSuccessSeconds(name, float64(time.Now().Unix()))
 	}
 }
 
