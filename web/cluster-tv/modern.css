@@ -33,18 +33,22 @@ html[data-theme="modern"] .tile {
   background: var(--tile-bg);
   border-radius: 8px; padding: 1rem;
   box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset;
+  /* See crt.css for rationale on min-width:0 + overflow-wrap. */
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 html[data-theme="modern"] .tile h2 { margin: 0 0 0.5rem; font-size: 1rem; font-weight: 600; color: var(--muted); }
 html[data-theme="modern"] .counts span { display: inline-block; margin-right: 1rem; font-variant-numeric: tabular-nums; }
 html[data-theme="modern"] .counts .ok { color: var(--ok); }
 html[data-theme="modern"] .counts .bad { color: var(--bad); }
-html[data-theme="modern"] .badlist { margin: 0.5rem 0 0; padding-left: 1rem; font-size: 0.85rem; color: var(--muted); }
+html[data-theme="modern"] .badlist { margin: 0.5rem 0 0; padding-left: 1rem; font-size: 0.85rem; color: var(--muted); word-break: break-word; }
 html[data-theme="modern"] .warn { color: var(--warn); }
 html[data-theme="modern"] .unreachable {
   color: var(--warn);
   font-style: italic;
   margin: 0.5rem 0 0;
   font-size: 0.9rem;
+  word-break: break-word;
 }
 
 html[data-theme="modern"] .banner.ok {

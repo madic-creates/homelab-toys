@@ -49,18 +49,24 @@ html[data-theme="crt"] .tile {
   background: var(--tile-bg);
   border: 1px solid var(--fg);
   padding: 1rem;
+  /* Grid items default to min-content for `min-width`, which prevents long
+     unbreakable strings (URLs, pod names) from making the tile expand past
+     its column. Forcing min-width:0 lets overflow-wrap actually take effect. */
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 html[data-theme="crt"] .tile h2 { margin: 0 0 0.5rem; font-size: 1.2rem; letter-spacing: 0.1em; }
 html[data-theme="crt"] .counts span { display: inline-block; margin-right: 1rem; }
 html[data-theme="crt"] .counts .bad { color: var(--bad); }
 html[data-theme="crt"] .counts .ok { color: var(--fg); }
-html[data-theme="crt"] .badlist { margin: 0.5rem 0 0; padding-left: 1rem; font-size: 0.9rem; }
+html[data-theme="crt"] .badlist { margin: 0.5rem 0 0; padding-left: 1rem; font-size: 0.9rem; word-break: break-word; }
 html[data-theme="crt"] .warn { color: var(--warn); }
 html[data-theme="crt"] .unreachable {
   color: var(--warn);
   font-style: italic;
   margin: 0.5rem 0 0;
+  word-break: break-word;
 }
 
 html[data-theme="crt"] .banner.ok {
