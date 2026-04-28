@@ -12,6 +12,12 @@ import (
 	"strings"
 )
 
+// maxResponseBytes bounds the size of an Argo CD response body. Each app's
+// JSON payload is small (a few KB); a 16 MiB ceiling tolerates very large
+// clusters while preventing a misbehaving or compromised server from
+// streaming an unbounded payload into the decoder.
+const maxResponseBytes = 16 << 20 // 16 MiB
+
 // Application is the trimmed-down view of an Argo CD application that
 // downstream code uses. We deliberately drop everything else from the
 // upstream JSON — the API surface is large and we are only consuming
@@ -81,7 +87,7 @@ func (c *Client) ListApplications(ctx context.Context) ([]Application, error) {
 			} `json:"status"`
 		} `json:"items"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxResponseBytes)).Decode(&raw); err != nil {
 		return nil, fmt.Errorf("argocd: decode body: %w", err)
 	}
 
