@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -80,6 +81,41 @@ func TestState_AllGreen_RequiresAtLeastOneFreshSource(t *testing.T) {
 	s.SetRestarts(RestartsData{Total: 0}, old)
 	if s.AllGreen(now) {
 		t.Errorf("AllGreen with every source stale = true, want false")
+	}
+}
+
+func TestState_ErrorAfterSuccessKeepsSlotFresh(t *testing.T) {
+	// SetXxxError must not clobber LastSuccess / Loaded — otherwise a
+	// transient ArgoCD outage would immediately flip the slot to "loading"
+	// and AllGreen would degrade prematurely. The slot should remain
+	// fresh-and-green from AllGreen's perspective until the staleness
+	// window elapses.
+	now := time.Date(2026, 4, 28, 12, 0, 0, 0, time.UTC)
+	s := NewState()
+	s.SetArgoCD(ArgoCDData{Healthy: 5}, now)
+	s.SetLonghorn(LonghornData{Healthy: 1}, now)
+	s.SetCerts(CertsData{Total: 0}, now)
+	s.SetRestarts(RestartsData{Total: 0}, now)
+
+	// Simulate a poll error 30 seconds later — well within the 5-minute window.
+	errAt := now.Add(30 * time.Second)
+	s.SetArgoCDError(errors.New("argocd timeout"), errAt)
+
+	if !s.AllGreen(errAt) {
+		t.Fatalf("AllGreen after error-on-fresh-slot = false, want true (slot still fresh)")
+	}
+	snap := s.Snapshot()
+	if !snap.ArgoCD.Loaded {
+		t.Errorf("Loaded got cleared by SetArgoCDError")
+	}
+	if snap.ArgoCD.LastSuccess != now {
+		t.Errorf("LastSuccess got modified by SetArgoCDError: %v", snap.ArgoCD.LastSuccess)
+	}
+	if snap.ArgoCD.LastError != "argocd timeout" {
+		t.Errorf("LastError = %q, want \"argocd timeout\"", snap.ArgoCD.LastError)
+	}
+	if snap.ArgoCD.LastFailure != errAt {
+		t.Errorf("LastFailure = %v, want %v", snap.ArgoCD.LastFailure, errAt)
 	}
 }
 

@@ -184,25 +184,27 @@ func (s *State) Snapshot() Snapshot {
 func (s *State) AllGreen(now time.Time) bool {
 	snap := s.Snapshot()
 
-	freshCount := 0
-	check := func(stale bool, bad bool) bool {
-		if stale {
-			return true // skip stale, doesn't influence verdict
-		}
-		freshCount++
-		return !bad
+	type sourceVerdict struct {
+		stale, bad bool
+	}
+	verdicts := []sourceVerdict{
+		{snap.ArgoCD.IsStale(now), snap.ArgoCD.Data.Degraded > 0 || snap.ArgoCD.Data.OutOfSync > 0},
+		{snap.Longhorn.IsStale(now), snap.Longhorn.Data.Degraded > 0 || snap.Longhorn.Data.Faulted > 0},
+		{snap.Certs.IsStale(now), snap.Certs.Data.Total > 0},
+		{snap.Restarts.IsStale(now), snap.Restarts.Data.Total > 0},
 	}
 
-	ok := check(snap.ArgoCD.IsStale(now),
-		snap.ArgoCD.Data.Degraded > 0 || snap.ArgoCD.Data.OutOfSync > 0) &&
-		check(snap.Longhorn.IsStale(now),
-			snap.Longhorn.Data.Degraded > 0 || snap.Longhorn.Data.Faulted > 0) &&
-		check(snap.Certs.IsStale(now),
-			snap.Certs.Data.Total > 0) &&
-		check(snap.Restarts.IsStale(now),
-			snap.Restarts.Data.Total > 0)
-
-	return ok && freshCount > 0
+	freshCount := 0
+	for _, v := range verdicts {
+		if v.stale {
+			continue
+		}
+		freshCount++
+		if v.bad {
+			return false
+		}
+	}
+	return freshCount > 0
 }
 
 // StaleCount counts stale loaded sources, for the "N source(s) stale" banner.
