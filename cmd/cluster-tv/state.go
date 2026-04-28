@@ -58,7 +58,7 @@ type RestartsData struct {
 
 // ---------- generic slot ----------
 
-// Slot[T] holds the most recent successful payload plus heartbeat metadata
+// Slot holds the most recent successful payload plus heartbeat metadata
 // for one source. Splitting LastSuccess and LastFailure lets the UI show
 // "last update X ago" while keeping a separate "last error" message.
 type Slot[T any] struct {

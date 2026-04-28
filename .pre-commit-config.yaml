@@ -1,0 +1,44 @@
+---
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      # Trims trailing whitespace.
+      - id: trailing-whitespace
+      # Makes sure files end in a newline and only a newline.
+      - id: end-of-file-fixer
+      # Replaces or checks mixed line ending.
+      - id: mixed-line-ending
+      # Detect strings that look like private keys.
+      - id: detect-private-key
+        exclude: internal/shared/redact_test.go
+      # Check for files that contain merge conflict strings.
+      - id: check-merge-conflict
+  - repo: https://github.com/Lucas-C/pre-commit-hooks
+    rev: v1.5.6
+    hooks:
+      # Replace CRLF end-lines by LF ones before committing
+      - id: remove-crlf
+      # Replace tabs by whitespaces before committing
+      #- id: remove-tabs
+      #  args: [--whitespaces-count, "2"]
+      #  exclude: (go\.mod|go\.sum)$
+  - repo: https://github.com/sirosen/fix-smartquotes
+    rev: 0.2.0
+    hooks:
+      # Find and replace smartquote characters with the standard ascii " and ' characters
+      - id: fix-smartquotes
+  - repo: local
+    hooks:
+      - id: golangci-lint
+        name: golangci-lint
+        entry: bash -c 'BIN=$(command -v golangci-lint || echo /go/bin/golangci-lint); GOMODCACHE=/tmp/gomodcache "$BIN" run'
+        language: system
+        types: [go]
+        pass_filenames: false
+      - id: go-test
+        name: go test
+        entry: bash -c 'GOMODCACHE=/tmp/gomodcache go test ./...'
+        language: system
+        types: [go]
+        pass_filenames: false
