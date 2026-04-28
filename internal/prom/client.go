@@ -55,7 +55,7 @@ func (c *Client) Query(ctx context.Context, q string) ([]Sample, error) {
 	if err != nil {
 		return nil, fmt.Errorf("prom request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	var raw struct {
 		Status    string `json:"status"`

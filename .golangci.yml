@@ -15,11 +15,18 @@ linters:
     errcheck:
       exclude-functions:
         - (net/http.ResponseWriter).Write
-        - (*net/http.Response).Body.Close
         - fmt.Fprint
         - fmt.Fprintf
         - fmt.Fprintln
         - io.Copy
+    staticcheck:
+      # QF1011 ("could omit type from declaration") fires on
+      # `var _ Interface = value` — but that pattern is the canonical Go
+      # idiom for compile-time interface conformance assertions, and we
+      # use it deliberately. Keep all other staticcheck/QF/etc. checks on.
+      checks:
+        - all
+        - -QF1011
 
   exclusions:
     paths:
