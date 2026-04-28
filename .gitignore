@@ -5,3 +5,7 @@
 *.out
 .idea/
 .vscode/
+
+# Stray binaries from `go build ./cmd/<name>/` invocations
+/cluster-tv
+/tamagotchi
