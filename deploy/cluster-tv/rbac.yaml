@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cluster-tv
+  namespace: cluster-tv
+---
+# Cluster-TV needs to list cert-manager Certificates cluster-wide for the
+# certificate-expiry signal. Everything else (ArgoCD, Longhorn via Prometheus,
+# pod-restart counts via Prometheus) goes through external APIs that need no
+# Kubernetes RBAC.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cluster-tv
+rules:
+  - apiGroups: ["cert-manager.io"]
+    resources: ["certificates"]
+    verbs: ["list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cluster-tv
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-tv
+subjects:
+  - kind: ServiceAccount
+    name: cluster-tv
+    namespace: cluster-tv

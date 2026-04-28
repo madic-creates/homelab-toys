@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cluster-tv
+  namespace: cluster-tv
+  labels:
+    app.kubernetes.io/name: cluster-tv
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cluster-tv
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: cluster-tv
+    spec:
+      serviceAccountName: cluster-tv
+      automountServiceAccountToken: true
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: cluster-tv
+          # Pin to a specific digest in production; `latest` is shown here for clarity.
+          image: ghcr.io/madic-creates/cluster-tv:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: PORT
+              value: "8080"
+            # Adjust to match your in-cluster Prometheus service.
+            - name: PROMETHEUS_URL
+              value: "http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090"
+            # IMPORTANT: use http:// (not https://) when argocd-server runs in
+            # insecure mode (Helm chart default sets server.insecure=true).
+            # See docs/cluster-tv-deployment.md for the full explanation.
+            - name: ARGOCD_URL
+              value: "http://argocd-server.argocd.svc.cluster.local"
+            - name: ARGOCD_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cluster-tv-env
+                  key: ARGOCD_TOKEN
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 10

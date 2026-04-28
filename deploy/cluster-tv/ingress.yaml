@@ -1,0 +1,33 @@
+# Optional: browser-facing Ingress. The example below assumes Traefik with an
+# Authelia forward-auth middleware. Adjust ingressClassName, annotations, and
+# host to match your setup, or replace this entirely with the Ingress flavour
+# you use (ingress-nginx, HAProxy, IngressRoute, HTTPRoute, etc.).
+#
+# Cluster-TV does not authenticate clients itself. Putting it behind a
+# forward-auth proxy is the recommended pattern.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cluster-tv
+  namespace: cluster-tv
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.middlewares: traefik-redirect@kubernetescrd, authelia-forwardauth-authelia@kubernetescrd
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - cluster-tv.example.com
+      secretName: cluster-tv-tls
+  rules:
+    - host: cluster-tv.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: cluster-tv
+                port:
+                  number: 8080

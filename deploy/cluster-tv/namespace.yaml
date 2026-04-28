@@ -1,0 +1,7 @@
+# Optional: only needed if you want a dedicated namespace.
+# If you deploy into an existing namespace (e.g. monitoring), skip this file
+# and update metadata.namespace in the other manifests accordingly.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cluster-tv

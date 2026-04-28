@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cluster-tv
+  namespace: cluster-tv
+  labels:
+    app.kubernetes.io/name: cluster-tv
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: cluster-tv
+  ports:
+    - port: 8080
+      targetPort: http
+      protocol: TCP
+      name: http

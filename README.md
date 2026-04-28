@@ -9,6 +9,7 @@ Each binary lives in `cmd/<name>/` and reuses the shared packages in `internal/`
 Single-page wall-display that aggregates ArgoCD application health, Longhorn
 volume state, cert-manager expiry, and pod restart counts. CRT and modern
 themes selectable via `?theme=...`. Image: `ghcr.io/madic-creates/cluster-tv`.
+Deployment reference: [`docs/cluster-tv-deployment.md`](docs/cluster-tv-deployment.md).
 
 ## Layout
 

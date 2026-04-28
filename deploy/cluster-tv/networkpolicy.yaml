@@ -1,0 +1,77 @@
+# Standard Kubernetes NetworkPolicy for cluster-tv.
+# Adjust the namespace selectors and labels to match your cluster.
+#
+# This policy only governs traffic FROM and TO cluster-tv pods. The
+# destination apps (argocd-server, prometheus) may have their own ingress
+# policies that need separate allow rules — see docs/cluster-tv-deployment.md.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cluster-tv
+  namespace: cluster-tv
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: cluster-tv
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow your ingress controller to reach the pod. Adjust the namespace
+    # label and pod label to match your setup (e.g. ingress-nginx, traefik).
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - port: 8080
+          protocol: TCP
+  egress:
+    # DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # Prometheus (Longhorn volume state + pod-restart deltas)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - port: 9090
+          protocol: TCP
+    # ArgoCD API server (port 8080 in the pod, regardless of the Service port)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: argocd
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: argocd-server
+      ports:
+        - port: 8080
+          protocol: TCP
+    # Kubernetes API server (cert-manager Certificate listing).
+    # Standard NetworkPolicy cannot select the apiserver by entity, so we
+    # allow egress to any pod in the kube-system namespace; tighten this
+    # for stricter setups (Cilium can use `toEntities: [kube-apiserver]`).
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: default
+      ports:
+        - port: 443
+          protocol: TCP
+        - port: 6443
+          protocol: TCP
