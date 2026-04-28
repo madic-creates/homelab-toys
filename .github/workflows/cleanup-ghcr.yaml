@@ -1,0 +1,86 @@
+---
+name: Cleanup old container images
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run — log what would be deleted, delete nothing"
+        type: boolean
+        default: false
+  schedule:
+    - cron: "0 4 * * 0"  # Weekly, Sundays 04:00 UTC
+
+permissions:
+  packages: write
+
+concurrency:
+  group: cleanup-ghcr
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - cluster-tv
+    steps:
+      - name: Cleanup ${{ matrix.package }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          PACKAGE: ${{ matrix.package }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          KEEP_TAGGED: "10"
+        run: |
+          set -euo pipefail
+
+          echo "### $PACKAGE"
+          gh api --paginate "/users/$OWNER/packages/container/$PACKAGE/versions" \
+            --jq '[.[] | {id, created_at, tags: (.metadata.container.tags // [])}] | sort_by(.created_at) | reverse' \
+            > versions.json
+
+          total=$(jq 'length' versions.json)
+          echo "Total versions: $total"
+
+          # Candidates: all untagged + tagged beyond the KEEP_TAGGED most recent.
+          # 'latest' sits on the newest push, so it is always in the kept top-N.
+          jq -r --argjson keep "$KEEP_TAGGED" '
+            ([.[] | select(.tags | length == 0)]
+            + [.[] | select(.tags | length > 0)][$keep:])
+            | .[] | "\(.id)\t\(.created_at)\t\(.tags | join(","))"
+          ' versions.json > to_delete.tsv
+
+          count=$(wc -l < to_delete.tsv | tr -d ' ')
+          echo "Would delete $count versions:"
+          while IFS=$'\t' read -r id created tags; do
+            [ -z "$id" ] && continue
+            printf '  id=%s created=%s tags=%s\n' "$id" "$created" "${tags:-<untagged>}"
+          done < to_delete.tsv
+
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "Dry run — nothing deleted."
+            exit 0
+          fi
+
+          deleted=0
+          failed=0
+          while IFS=$'\t' read -r id _ _; do
+            [ -z "$id" ] && continue
+            if gh api -X DELETE "/users/$OWNER/packages/container/$PACKAGE/versions/$id" --silent; then
+              deleted=$((deleted + 1))
+            else
+              failed=$((failed + 1))
+              echo "  failed to delete id=$id" >&2
+            fi
+            # Gentle pacing to stay below secondary rate limits on large backlogs.
+            sleep 0.2
+          done < to_delete.tsv
+
+          echo "Deleted: $deleted"
+          if [ "$failed" -gt 0 ]; then
+            echo "Failed: $failed" >&2
+            exit 1
+          fi

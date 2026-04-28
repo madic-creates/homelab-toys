@@ -1,14 +1,17 @@
 # GHCR Image Cleanup
 
-This repository publishes two container images to `ghcr.io` on every push to
+This repository publishes container images to `ghcr.io` on every push to
 `main`:
 
-- `ghcr.io/<owner>/claude-alert-kubernetes-analyzer`
-- `ghcr.io/<owner>/claude-alert-checkmk-analyzer`
+- `ghcr.io/<owner>/cluster-tv`
 
 Every build produces a fresh short-SHA tag plus an updated `latest` alias (see
-[`build.yaml`](../.github/workflows/build.yaml)). Without pruning, the tag list
-grows forever. The `cleanup-ghcr.yaml` workflow trims it back.
+[`release.yaml`](../.github/workflows/release.yaml)). Without pruning, the tag
+list grows forever. The `cleanup-ghcr.yaml` workflow trims it back.
+
+When additional binaries land (the planned `tamagotchi` companion), add them to
+the workflow's `matrix.package` list — the rest of the workflow is package-name
+agnostic.
 
 - Workflow: [`.github/workflows/cleanup-ghcr.yaml`](../.github/workflows/cleanup-ghcr.yaml)
 
@@ -19,7 +22,7 @@ grows forever. The `cleanup-ghcr.yaml` workflow trims it back.
 | `schedule` (`0 4 * * 0`) | Weekly run, Sundays 04:00 UTC |
 | `workflow_dispatch` | Manual trigger with `dry_run` input |
 
-The job runs on a matrix of both package names and uses the built-in
+The job runs on a matrix of every published package and uses the built-in
 `GITHUB_TOKEN` with `packages: write`. A `concurrency` group
 (`cleanup-ghcr`, `cancel-in-progress: false`) prevents overlapping runs from
 racing against each other on the GHCR API.
