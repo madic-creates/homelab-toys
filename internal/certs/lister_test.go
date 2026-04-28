@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -89,6 +88,3 @@ func TestExpiringSoon_EmptyList(t *testing.T) {
 		t.Errorf("len = %d, want 0", len(res))
 	}
 }
-
-// silence unused-import warning when go test --short is used
-var _ = metav1.ListOptions{}
