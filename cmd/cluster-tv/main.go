@@ -90,6 +90,9 @@ func run(parent context.Context) error {
 		Addr:              ":" + port,
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
 	errCh := make(chan error, 1)
@@ -100,13 +103,21 @@ func run(parent context.Context) error {
 		}
 	}()
 
-	select {
-	case err := <-errCh:
-		return err
-	case <-ctx.Done():
+	shutdown := func() error {
 		shutdownCtx, c2 := context.WithTimeout(context.Background(), 5*time.Second)
 		defer c2()
 		return srv.Shutdown(shutdownCtx)
+	}
+
+	select {
+	case err := <-errCh:
+		// Listener died unexpectedly. Still attempt to shut down the server
+		// cleanly so any in-flight handlers finish and the listener socket
+		// is released; report the original listen error to the caller.
+		_ = shutdown()
+		return err
+	case <-ctx.Done():
+		return shutdown()
 	}
 }
 
