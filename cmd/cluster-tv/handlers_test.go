@@ -97,6 +97,26 @@ func TestHandleHealthz_GraceWithin30sOfStart(t *testing.T) {
 	}
 }
 
+func TestHandleHealthz_503AfterGraceWithUnloadedSource(t *testing.T) {
+	// Spec: after the 30-second init grace, any source that has not yet
+	// loaded should produce a 503 — the binary is alive but degraded.
+	now := time.Now()
+	s := NewState()
+	s.SetArgoCD(ArgoCDData{}, now)
+	s.SetLonghorn(LonghornData{}, now)
+	s.SetCerts(CertsData{}, now)
+	// Restarts deliberately never set — simulates an upstream that never
+	// responded successfully.
+	h := NewHandlers(s, testTemplates(t), func() time.Time { return now })
+	h.processStart = now.Add(-2 * time.Minute) // way past 30s grace
+
+	rec := httptest.NewRecorder()
+	h.HandleHealthz(rec, httptest.NewRequest(http.MethodGet, "/healthz", nil))
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503 (unloaded source past grace)", rec.Code)
+	}
+}
+
 func TestHandleIndex_ThemeQuery(t *testing.T) {
 	s := NewState()
 	s.SetArgoCD(ArgoCDData{Healthy: 7}, time.Now())

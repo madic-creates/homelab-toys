@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"html/template"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -79,7 +80,9 @@ func (h *Handlers) HandleAPIState(w http.ResponseWriter, _ *http.Request) {
 	snap := h.state.Snapshot()
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	_ = json.NewEncoder(w).Encode(snap)
+	if err := json.NewEncoder(w).Encode(snap); err != nil {
+		slog.Warn("api/state encode failed", "error", err)
+	}
 }
 
 // ---------- /healthz ----------
@@ -122,15 +125,14 @@ type indexData struct {
 }
 
 func (h *Handlers) HandleIndex(w http.ResponseWriter, r *http.Request) {
-	start := h.now()
-	defer func() { h.renderDuration.Observe(time.Since(start).Seconds()) }()
+	now := h.now()
+	defer func() { h.renderDuration.Observe(time.Since(now).Seconds()) }()
 
 	theme := r.URL.Query().Get("theme")
 	if theme != "modern" {
 		theme = "crt" // default + fallback for invalid values
 	}
 
-	now := h.now()
 	data := indexData{
 		Theme:    theme,
 		S:        h.state.Snapshot(),
