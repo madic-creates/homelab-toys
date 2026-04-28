@@ -11,15 +11,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-// healthzWindow is the heartbeat freshness threshold for /healthz. The
-// stalenessWindow constant in state.go (5 min) is for "is this tile
-// trustworthy"; healthz is a tighter "is the binary alive" signal.
-const healthzWindow = 90 * time.Second
-
-// initGrace is how long after process start /healthz tolerates sources
-// that have not yet loaded. Matches the 30s init phase in the spec.
-const initGrace = 30 * time.Second
-
 type Handlers struct {
 	state        *State
 	tpl          *template.Template
@@ -102,30 +93,12 @@ func (h *Handlers) HandleAPIState(w http.ResponseWriter, _ *http.Request) {
 
 // ---------- /healthz ----------
 
-// HandleHealthz returns 200 iff every loaded source has a heartbeat newer
-// than healthzWindow OR the process is still in its init grace and the
-// source has never loaded. 503 otherwise.
+// HandleHealthz is a liveness probe that returns 200 as long as this
+// process can serve HTTP. Source-data freshness is intentionally NOT
+// checked here: cluster-tv's job is to keep polling and surface whatever
+// it knows, including "source unreachable" UI states. Pod restarts on
+// data outages would only delay recovery without helping anyone.
 func (h *Handlers) HandleHealthz(w http.ResponseWriter, _ *http.Request) {
-	now := h.now()
-	snap := h.state.Snapshot()
-	inGrace := now.Sub(h.processStart) < initGrace
-
-	check := func(loaded bool, last time.Time) bool {
-		if !loaded {
-			return inGrace
-		}
-		return now.Sub(last) <= healthzWindow
-	}
-
-	ok := check(snap.ArgoCD.Loaded, snap.ArgoCD.LastSuccess) &&
-		check(snap.Longhorn.Loaded, snap.Longhorn.LastSuccess) &&
-		check(snap.Certs.Loaded, snap.Certs.LastSuccess) &&
-		check(snap.Restarts.Loaded, snap.Restarts.LastSuccess)
-
-	if !ok {
-		http.Error(w, "stale source", http.StatusServiceUnavailable)
-		return
-	}
 	_, _ = w.Write([]byte("ok"))
 }
 

@@ -57,6 +57,11 @@ html[data-theme="crt"] .counts .bad { color: var(--bad); }
 html[data-theme="crt"] .counts .ok { color: var(--fg); }
 html[data-theme="crt"] .badlist { margin: 0.5rem 0 0; padding-left: 1rem; font-size: 0.9rem; }
 html[data-theme="crt"] .warn { color: var(--warn); }
+html[data-theme="crt"] .unreachable {
+  color: var(--warn);
+  font-style: italic;
+  margin: 0.5rem 0 0;
+}
 
 html[data-theme="crt"] .banner.ok {
   text-align: center; padding: 4rem 1rem;

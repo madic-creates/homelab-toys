@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"html/template"
 	"net/http"
 	"net/http/httptest"
@@ -47,73 +48,46 @@ func TestHandleAPIState_AlwaysReturnsJSON(t *testing.T) {
 	}
 }
 
-func TestHandleHealthz_OKWhenAllFresh(t *testing.T) {
+func TestHandleHealthz_AlwaysReturns200(t *testing.T) {
+	// /healthz is a liveness probe — it must NOT depend on data freshness.
+	// Verify across every interesting State configuration.
 	now := time.Now()
-	s := NewState()
-	s.SetArgoCD(ArgoCDData{}, now)
-	s.SetLonghorn(LonghornData{}, now)
-	s.SetCerts(CertsData{}, now)
-	s.SetRestarts(RestartsData{}, now)
-
-	h := NewHandlers(s, testTemplates(t), func() time.Time { return now })
-	h.processStart = now.Add(-10 * time.Minute)
-
-	rec := httptest.NewRecorder()
-	h.HandleHealthz(rec, httptest.NewRequest(http.MethodGet, "/healthz", nil))
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200", rec.Code)
+	cases := []struct {
+		name string
+		set  func(*State)
+	}{
+		{"empty state", func(s *State) {}},
+		{"all fresh", func(s *State) {
+			s.SetArgoCD(ArgoCDData{}, now)
+			s.SetLonghorn(LonghornData{}, now)
+			s.SetCerts(CertsData{}, now)
+			s.SetRestarts(RestartsData{}, now)
+		}},
+		{"all stale", func(s *State) {
+			old := now.Add(-1 * time.Hour)
+			s.SetArgoCD(ArgoCDData{}, old)
+			s.SetLonghorn(LonghornData{}, old)
+			s.SetCerts(CertsData{}, old)
+			s.SetRestarts(RestartsData{}, old)
+		}},
+		{"one source has only ever errored (Loaded=false, LastError set)", func(s *State) {
+			s.SetArgoCDError(errors.New("argocd timeout"), now)
+		}},
 	}
-}
-
-func TestHandleHealthz_503WhenSourceStaleBeyond90s(t *testing.T) {
-	now := time.Now()
-	s := NewState()
-	s.SetArgoCD(ArgoCDData{}, now.Add(-2*time.Minute)) // > 90s
-	s.SetLonghorn(LonghornData{}, now)
-	s.SetCerts(CertsData{}, now)
-	s.SetRestarts(RestartsData{}, now)
-
-	h := NewHandlers(s, testTemplates(t), func() time.Time { return now })
-	h.processStart = now.Add(-10 * time.Minute)
-
-	rec := httptest.NewRecorder()
-	h.HandleHealthz(rec, httptest.NewRequest(http.MethodGet, "/healthz", nil))
-	if rec.Code != http.StatusServiceUnavailable {
-		t.Fatalf("status = %d, want 503", rec.Code)
-	}
-}
-
-func TestHandleHealthz_GraceWithin30sOfStart(t *testing.T) {
-	now := time.Now()
-	// State has never loaded any source. Process started 5s ago.
-	s := NewState()
-	h := NewHandlers(s, testTemplates(t), func() time.Time { return now })
-	h.processStart = now.Add(-5 * time.Second)
-
-	rec := httptest.NewRecorder()
-	h.HandleHealthz(rec, httptest.NewRequest(http.MethodGet, "/healthz", nil))
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status during init grace = %d, want 200", rec.Code)
-	}
-}
-
-func TestHandleHealthz_503AfterGraceWithUnloadedSource(t *testing.T) {
-	// Spec: after the 30-second init grace, any source that has not yet
-	// loaded should produce a 503 — the binary is alive but degraded.
-	now := time.Now()
-	s := NewState()
-	s.SetArgoCD(ArgoCDData{}, now)
-	s.SetLonghorn(LonghornData{}, now)
-	s.SetCerts(CertsData{}, now)
-	// Restarts deliberately never set — simulates an upstream that never
-	// responded successfully.
-	h := NewHandlers(s, testTemplates(t), func() time.Time { return now })
-	h.processStart = now.Add(-2 * time.Minute) // way past 30s grace
-
-	rec := httptest.NewRecorder()
-	h.HandleHealthz(rec, httptest.NewRequest(http.MethodGet, "/healthz", nil))
-	if rec.Code != http.StatusServiceUnavailable {
-		t.Fatalf("status = %d, want 503 (unloaded source past grace)", rec.Code)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s := NewState()
+			tc.set(s)
+			h := NewHandlers(s, testTemplates(t), func() time.Time { return now })
+			rec := httptest.NewRecorder()
+			h.HandleHealthz(rec, httptest.NewRequest(http.MethodGet, "/healthz", nil))
+			if rec.Code != http.StatusOK {
+				t.Errorf("status = %d, want 200", rec.Code)
+			}
+			if rec.Body.String() != "ok" {
+				t.Errorf("body = %q, want \"ok\"", rec.Body.String())
+			}
+		})
 	}
 }
 

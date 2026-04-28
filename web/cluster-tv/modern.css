@@ -40,6 +40,12 @@ html[data-theme="modern"] .counts .ok { color: var(--ok); }
 html[data-theme="modern"] .counts .bad { color: var(--bad); }
 html[data-theme="modern"] .badlist { margin: 0.5rem 0 0; padding-left: 1rem; font-size: 0.85rem; color: var(--muted); }
 html[data-theme="modern"] .warn { color: var(--warn); }
+html[data-theme="modern"] .unreachable {
+  color: var(--warn);
+  font-style: italic;
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+}
 
 html[data-theme="modern"] .banner.ok {
   text-align: center; padding: 5rem 1rem;
