@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -160,5 +159,4 @@ func TestRunSource_PollErrorKeepsRunning(t *testing.T) {
 		t.Errorf("calls = %d, want >= 3 (errors must not stop the loop)", calls.Load())
 	}
 	// We don't assert on log output; this test is about not exiting.
-	_ = strings.Contains
 }

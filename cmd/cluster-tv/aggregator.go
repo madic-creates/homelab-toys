@@ -55,10 +55,12 @@ func runSourceWithBackoff(ctx context.Context, name string, poll pollFunc, inter
 		if ctx.Err() != nil {
 			return
 		}
+		timer := time.NewTimer(backoff)
 		select {
 		case <-ctx.Done():
+			timer.Stop()
 			return
-		case <-time.After(backoff):
+		case <-timer.C:
 		}
 	}
 }
@@ -126,7 +128,11 @@ func MakeLonghornPoll(c *prom.Client, s *State, now func() time.Time) pollFunc {
 func longhornSamplesToData(samples []prom.Sample) LonghornData {
 	out := LonghornData{}
 	for _, s := range samples {
-		n, _ := strconv.Atoi(s.Value)
+		n, err := strconv.Atoi(s.Value)
+		if err != nil {
+			slog.Warn("prometheus value not int", "value", s.Value, "metric", s.Metric, "error", err)
+			continue
+		}
 		switch s.Metric["state"] {
 		case "healthy":
 			out.Healthy = n
@@ -156,9 +162,13 @@ func MakeRestartsPoll(c *prom.Client, s *State, now func() time.Time) pollFunc {
 }
 
 func restartSamplesToData(samples []prom.Sample) RestartsData {
-	out := RestartsData{Total: len(samples)}
+	out := RestartsData{}
 	for _, s := range samples {
-		n, _ := strconv.Atoi(s.Value)
+		n, err := strconv.Atoi(s.Value)
+		if err != nil {
+			slog.Warn("prometheus value not int", "value", s.Value, "metric", s.Metric, "error", err)
+			continue
+		}
 		out.Pods = append(out.Pods, RestartingPod{
 			Namespace: s.Metric["namespace"],
 			Pod:       s.Metric["pod"],
@@ -166,6 +176,7 @@ func restartSamplesToData(samples []prom.Sample) RestartsData {
 			Restarts:  n,
 		})
 	}
+	out.Total = len(out.Pods)
 	return out
 }
 
