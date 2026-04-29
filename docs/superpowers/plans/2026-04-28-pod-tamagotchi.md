@@ -2009,7 +2009,7 @@ git commit -m "feat(tamagotchi): add aggregator scaffold + nodes poll"
 
 These polls reuse the `internal/argocd`, `internal/prom`, `internal/certs` clients that cluster-tv already uses. Each poll converts the upstream's raw data into a single integer penalty per the spec table, then writes it to State.
 
-The Longhorn signal — "≥1 Degraded or Faulted volume" — is sourced from a Prometheus query the same way cluster-tv does it. The exact PromQL `count(longhorn_volume_robustness == 1) + count(longhorn_volume_robustness == 2)` (degraded + faulted) returns one scalar; if `> 0`, penalty = 1.
+The Longhorn signal is sourced from a Prometheus query against the longhorn-manager exporter's `longhorn_volume_robustness` enum (0=Healthy, 1=Degraded, 2=Faulted, 3=Unknown). Tamagotchi uses `count(longhorn_volume_robustness > 0)` — non-Healthy in any form contributes to the pet's mood, which is the conservative interpretation appropriate for a pet-health signal. (cluster-tv has a different query that counts only Degraded volumes — that divergence is intentional given the binaries' different presentation goals.) If the result is > 0, penalty = 1.
 
 The restart-storm signal reuses cluster-tv's PromQL: `count(increase(kube_pod_container_status_restarts_total[24h]) > 5)` returns the count of pods restarting > 5 times in the last 24h. Penalty = `min(2, count)`.
 
