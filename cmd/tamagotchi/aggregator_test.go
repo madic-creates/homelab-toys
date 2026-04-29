@@ -336,3 +336,38 @@ func TestMakeCertsPoll_ErrorRecorded(t *testing.T) {
 		t.Error("Certs LastError not recorded")
 	}
 }
+
+func TestMakeLonghornPoll_AllHealthyPenalty0(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		// Empty result vector — no longhorn volumes match `> 0` (i.e. all healthy).
+		w.Write([]byte(`{"status":"success","data":{"resultType":"vector","result":[]}}`))
+	}))
+	defer srv.Close()
+	c := prom.NewClient(srv.URL, srv.Client())
+	st := NewState()
+	poll := MakeLonghornPoll(c, st, time.Now)
+	if err := poll(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := st.Snapshot().Longhorn.Data; got != 0 {
+		t.Errorf("longhorn penalty = %d, want 0", got)
+	}
+}
+
+func TestMakeRestartsPoll_NoneRestartingPenalty0(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"status":"success","data":{"resultType":"vector","result":[]}}`))
+	}))
+	defer srv.Close()
+	c := prom.NewClient(srv.URL, srv.Client())
+	st := NewState()
+	poll := MakeRestartsPoll(c, st, time.Now)
+	if err := poll(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := st.Snapshot().Restarts.Data; got != 0 {
+		t.Errorf("restarts penalty = %d, want 0", got)
+	}
+}

@@ -68,11 +68,16 @@ func (h *Handlers) LastSuccessSeconds(source string, seconds float64) {
 // APIState serves a JSON snapshot — see the spec's response shape.
 func (h *Handlers) APIState(w http.ResponseWriter, _ *http.Request) {
 	snap := h.state.Snapshot()
+	// factors is deferred to v2; v1 communicates source contributions
+	// only via stale_sources. Returning an empty array (rather than
+	// omitting the key) keeps the contract stable — consumers can
+	// observe an empty slice and know their parser is correct.
 	resp := struct {
 		Mood         string   `json:"mood"`
 		MoodLevel    int      `json:"mood_level"`
 		AgeDays      int      `json:"age_days"`
 		BornAt       string   `json:"born_at"`
+		Factors      []any    `json:"factors"`
 		StaleSources []string `json:"stale_sources"`
 		Confused     bool     `json:"confused"`
 		Hello        bool     `json:"hello"`
@@ -81,6 +86,7 @@ func (h *Handlers) APIState(w http.ResponseWriter, _ *http.Request) {
 		MoodLevel:    snap.Mood.Level,
 		AgeDays:      ageInDays(snap.Birthday, h.now()),
 		BornAt:       formatBirthday(snap.Birthday),
+		Factors:      []any{},
 		StaleSources: snap.StaleSources,
 		Confused:     snap.Confused,
 		Hello:        !snap.HasFirstTick,

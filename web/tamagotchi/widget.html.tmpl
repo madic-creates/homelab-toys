@@ -9,11 +9,17 @@
 <div class="sprite-wrap">{{.Sprite}}</div>
 <span class="mood-text">{{.Mood}}</span>
 <script>
+  // See index.html.tmpl for the rationale on full reload on mood change.
+  const initialMood = document.body.className.match(/mood-([a-z]+)/)?.[1] || 'happy';
   async function tick() {
     try {
       const r = await fetch('/api/state', {cache: 'no-store'});
       if (!r.ok) return;
       const j = await r.json();
+      if (j.mood !== initialMood) {
+        window.location.reload();
+        return;
+      }
       const cls = 'widget mood-' + j.mood + (j.confused ? ' confused' : '');
       if (document.body.className !== cls) document.body.className = cls;
       const text = document.querySelector('.mood-text');

@@ -26,6 +26,7 @@ jobs:
       matrix:
         package:
           - cluster-tv
+          - tamagotchi
     steps:
       - name: Cleanup ${{ matrix.package }}
         env:

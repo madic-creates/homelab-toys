@@ -14,17 +14,28 @@
   {{if .Stale}}<p class="stale">Stale: {{range $i, $s := .Stale}}{{if $i}}, {{end}}{{$s}}{{end}}</p>{{end}}
 </main>
 <script>
+  // Capture the initial server-rendered mood so we can detect changes.
+  // The CSS animation keys off body.mood-* and would update on class
+  // change alone, but the inline SVG sprite is fixed at server-render
+  // time. A full reload is the simplest way to get a fresh sprite.
+  const initialMood = document.body.className.match(/mood-([a-z]+)/)?.[1] || 'happy';
   async function tick() {
     try {
       const r = await fetch('/api/state', {cache: 'no-store'});
       if (!r.ok) return;
       const j = await r.json();
-      const cls = 'mood-' + j.mood + (j.confused ? ' confused' : '');
-      if (document.body.className !== cls) document.body.className = cls;
+      if (j.mood !== initialMood) {
+        window.location.reload();
+        return;
+      }
+      // Same mood — refresh just the dynamic text fields.
       const text = document.querySelector('.mood-text');
       if (text) text.textContent = j.mood;
       const age = document.querySelector('.age');
       if (age) age.textContent = 'Age: ' + j.age_days + ' day(s)';
+      // Toggle the .confused class without a reload (sprite already includes the ? overlay if confused was true at render time, so a confused-state flip benefits from the same reload semantics — but for now just refresh CSS).
+      const cls = 'mood-' + j.mood + (j.confused ? ' confused' : '');
+      if (document.body.className !== cls) document.body.className = cls;
     } catch (e) { /* swallow — next tick */ }
   }
   setInterval(tick, 30000);
