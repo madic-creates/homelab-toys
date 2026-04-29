@@ -153,3 +153,34 @@ func formatBirthday(birthday time.Time) string {
 	}
 	return birthday.UTC().Format(time.RFC3339)
 }
+
+const healthzWindow = 90 * time.Second
+
+// Healthz returns 200 if every source's last successful poll is within
+// healthzWindow, else 503. During init grace (no source loaded yet)
+// returns 200 to avoid blocking readiness before the first poll.
+func (h *Handlers) Healthz(w http.ResponseWriter, _ *http.Request) {
+	snap := h.state.Snapshot()
+	now := h.now()
+
+	slots := []Slot[int]{snap.ArgoCD, snap.Longhorn, snap.Certs, snap.Restarts, snap.Nodes}
+	anyLoaded := false
+	for _, s := range slots {
+		if s.Loaded {
+			anyLoaded = true
+			break
+		}
+	}
+	if !anyLoaded {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	for _, s := range slots {
+		if !s.Loaded || now.Sub(s.LastSuccess) > healthzWindow {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+	}
+	w.WriteHeader(http.StatusOK)
+}

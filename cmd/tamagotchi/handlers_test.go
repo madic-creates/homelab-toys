@@ -126,3 +126,48 @@ func TestWidget_RendersSpriteAndMoodText(t *testing.T) {
 		t.Errorf("widget missing mood text: %s", body)
 	}
 }
+
+func TestHealthz_AllFreshOK(t *testing.T) {
+	st := NewState()
+	now := time.Date(2026, 4, 28, 12, 0, 0, 0, time.UTC)
+	for _, fn := range []func(int, time.Time){
+		st.SetArgoCD, st.SetLonghorn, st.SetCerts, st.SetRestarts, st.SetNodes,
+	} {
+		fn(0, now)
+	}
+	h := NewHandlers(st, nil, func() time.Time { return now.Add(30 * time.Second) })
+	rec := httptest.NewRecorder()
+	h.Healthz(rec, httptest.NewRequest(http.MethodGet, "/healthz", nil))
+	if rec.Code != 200 {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+}
+
+func TestHealthz_StaleSourceFails(t *testing.T) {
+	st := NewState()
+	now := time.Date(2026, 4, 28, 12, 0, 0, 0, time.UTC)
+	st.SetArgoCD(0, now)
+	st.SetLonghorn(0, now)
+	st.SetCerts(0, now)
+	st.SetRestarts(0, now)
+	st.SetNodes(0, now.Add(-2*time.Minute)) // > 90s old
+	h := NewHandlers(st, nil, func() time.Time { return now })
+	rec := httptest.NewRecorder()
+	h.Healthz(rec, httptest.NewRequest(http.MethodGet, "/healthz", nil))
+	if rec.Code != 503 {
+		t.Fatalf("status = %d, want 503", rec.Code)
+	}
+}
+
+func TestHealthz_InitGraceOK(t *testing.T) {
+	// No source loaded yet — /healthz should still be 200 so readiness
+	// doesn't fail before the first poll arrives.
+	st := NewState()
+	now := time.Date(2026, 4, 28, 12, 0, 0, 0, time.UTC)
+	h := NewHandlers(st, nil, func() time.Time { return now })
+	rec := httptest.NewRecorder()
+	h.Healthz(rec, httptest.NewRequest(http.MethodGet, "/healthz", nil))
+	if rec.Code != 200 {
+		t.Fatalf("init grace status = %d, want 200", rec.Code)
+	}
+}
