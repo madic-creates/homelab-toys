@@ -65,19 +65,25 @@ func (h *Handlers) LastSuccessSeconds(source string, seconds float64) {
 	h.lastSuccessSecs.WithLabelValues(source).Set(seconds)
 }
 
+// factor is one source's contribution to the mood. Penalty is the integer
+// the aggregator wrote into State; Error carries the most recent poll
+// failure if any. Operators read this to diagnose "why is the pet sick?"
+// without grepping logs or hitting per-binary metrics.
+type factor struct {
+	Source  string `json:"source"`
+	Penalty int    `json:"penalty"`
+	Error   string `json:"error,omitempty"`
+}
+
 // APIState serves a JSON snapshot — see the spec's response shape.
 func (h *Handlers) APIState(w http.ResponseWriter, _ *http.Request) {
 	snap := h.state.Snapshot()
-	// factors is deferred to v2; v1 communicates source contributions
-	// only via stale_sources. Returning an empty array (rather than
-	// omitting the key) keeps the contract stable — consumers can
-	// observe an empty slice and know their parser is correct.
 	resp := struct {
 		Mood         string   `json:"mood"`
 		MoodLevel    int      `json:"mood_level"`
 		AgeDays      int      `json:"age_days"`
 		BornAt       string   `json:"born_at"`
-		Factors      []any    `json:"factors"`
+		Factors      []factor `json:"factors"`
 		StaleSources []string `json:"stale_sources"`
 		Confused     bool     `json:"confused"`
 		Hello        bool     `json:"hello"`
@@ -86,7 +92,7 @@ func (h *Handlers) APIState(w http.ResponseWriter, _ *http.Request) {
 		MoodLevel:    snap.Mood.Level,
 		AgeDays:      ageInDays(snap.Birthday, h.now()),
 		BornAt:       formatBirthday(snap.Birthday),
-		Factors:      []any{},
+		Factors:      buildFactors(snap),
 		StaleSources: snap.StaleSources,
 		Confused:     snap.Confused,
 		Hello:        !snap.HasFirstTick,
@@ -102,6 +108,34 @@ func (h *Handlers) APIState(w http.ResponseWriter, _ *http.Request) {
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		slog.Warn("encode /api/state", "error", err)
 	}
+}
+
+// buildFactors emits one entry per source whose penalty is non-zero or
+// whose last poll failed. Sources contributing zero are omitted to keep
+// the array short. Order matches the algorithm's source order so the
+// JSON is stable across calls.
+func buildFactors(snap Snapshot) []factor {
+	out := make([]factor, 0, 5)
+	entries := []struct {
+		name string
+		slot Slot[int]
+	}{
+		{"argocd", snap.ArgoCD},
+		{"longhorn", snap.Longhorn},
+		{"certs", snap.Certs},
+		{"restarts", snap.Restarts},
+		{"nodes", snap.Nodes},
+	}
+	for _, e := range entries {
+		if e.slot.Data > 0 || e.slot.LastError != "" {
+			out = append(out, factor{
+				Source:  e.name,
+				Penalty: e.slot.Data,
+				Error:   e.slot.LastError,
+			})
+		}
+	}
+	return out
 }
 
 type pageData struct {

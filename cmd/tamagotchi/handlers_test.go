@@ -15,6 +15,7 @@ type apiStateResponse struct {
 	MoodLevel    int      `json:"mood_level"`
 	AgeDays      int      `json:"age_days"`
 	BornAt       string   `json:"born_at"`
+	Factors      []factor `json:"factors"`
 	StaleSources []string `json:"stale_sources"`
 	Confused     bool     `json:"confused"`
 	Hello        bool     `json:"hello"`
@@ -183,3 +184,53 @@ func TestMetrics_ServesPrometheusFormat(t *testing.T) {
 		t.Errorf("metric body missing counter line: %s", body)
 	}
 }
+
+func TestAPIState_FactorsBreakdown(t *testing.T) {
+	st := NewState()
+	now := time.Date(2026, 4, 28, 12, 0, 0, 0, time.UTC)
+	st.SetBirthday(now)
+	st.SetArgoCD(1, now) // contributes
+	st.SetLonghorn(0, now)
+	st.SetCerts(0, now)
+	st.SetRestarts(2, now) // contributes (cap)
+	st.SetNodes(0, now)
+	st.SetCertsError(errAPIDown, now)
+	st.UpdateMood(now)
+
+	h := NewHandlers(st, nil, func() time.Time { return now })
+	rec := httptest.NewRecorder()
+	h.APIState(rec, httptest.NewRequest(http.MethodGet, "/api/state", nil))
+
+	var got apiStateResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	// Expected factors: argocd (penalty 1), restarts (penalty 2), certs
+	// (penalty 0 but has LastError). longhorn and nodes both have penalty
+	// 0 and no error, so they're omitted.
+	if len(got.Factors) != 3 {
+		t.Fatalf("len(factors) = %d, want 3; got: %+v", len(got.Factors), got.Factors)
+	}
+	want := map[string]factor{
+		"argocd":   {Source: "argocd", Penalty: 1},
+		"restarts": {Source: "restarts", Penalty: 2},
+		"certs":    {Source: "certs", Penalty: 0, Error: "api down"},
+	}
+	for _, f := range got.Factors {
+		w, ok := want[f.Source]
+		if !ok {
+			t.Errorf("unexpected factor: %+v", f)
+			continue
+		}
+		if f.Penalty != w.Penalty || f.Error != w.Error {
+			t.Errorf("factor[%s] = %+v, want %+v", f.Source, f, w)
+		}
+	}
+}
+
+// errAPIDown is a sentinel used to simulate a poll failure in tests.
+var errAPIDown = errAPIDownSentinel("api down")
+
+type errAPIDownSentinel string
+
+func (e errAPIDownSentinel) Error() string { return string(e) }

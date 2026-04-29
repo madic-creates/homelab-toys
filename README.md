@@ -23,22 +23,28 @@ gethomepage custom widgets, alerting):
 
 ```json
 {
-  "mood": "happy",
-  "mood_level": 1,
+  "mood": "sick",
+  "mood_level": 3,
   "age_days": 42,
   "born_at": "2026-01-01T00:00:00Z",
-  "factors": [],
+  "factors": [
+    {"source": "argocd", "penalty": 1},
+    {"source": "certs", "penalty": 1},
+    {"source": "restarts", "penalty": 2}
+  ],
   "stale_sources": [],
   "confused": false,
   "hello": false
 }
 ```
 
-`mood_level` is `0..4` (ecstatic→dying); `stale_sources` lists upstream sources that
+`mood_level` is `0..4` (ecstatic→dying). `factors` lists each source whose penalty
+is non-zero or whose last poll failed (`{source, penalty, error?}`); sources
+contributing nothing are omitted, so an empty `factors` with a non-`ecstatic` mood
+indicates the algorithm has stale data. `stale_sources` lists upstream sources that
 have not polled successfully in the last 5 minutes; `confused` is `true` when ≥2
 sources are stale; `hello` is `true` only during the init grace before the first
-poll completes. `factors` is reserved for v2 per-source diagnostics and currently
-returns an empty array.
+poll completes.
 
 ## Layout
 
