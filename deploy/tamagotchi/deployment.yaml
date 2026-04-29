@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tamagotchi
+  namespace: tamagotchi
+  labels:
+    app.kubernetes.io/name: tamagotchi
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tamagotchi
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tamagotchi
+    spec:
+      serviceAccountName: tamagotchi
+      automountServiceAccountToken: true
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: tamagotchi
+          # Pin to a specific digest in production; `latest` shown for clarity.
+          image: ghcr.io/madic-creates/tamagotchi:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: PORT
+              value: "8080"
+            - name: PROMETHEUS_URL
+              value: "http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090"
+            - name: ARGOCD_URL
+              value: "http://argocd-server.argocd.svc.cluster.local"
+            - name: ARGOCD_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: tamagotchi-env
+                  key: ARGOCD_TOKEN
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          # Liveness uses a TCP socket probe rather than /healthz. /healthz
+          # returns 503 when sources have been stale for >90s; using it as
+          # liveness would restart the pod during sustained upstream
+          # outages (ArgoCD/Prometheus down). TCP socket means "is the
+          # process alive and listening" — the right liveness signal.
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 30
+          # Readiness uses /healthz so traffic is removed from the Service
+          # endpoints when the pod can't serve fresh data. The pod stays
+          # alive (not killed) and recovers automatically once polls succeed.
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 10

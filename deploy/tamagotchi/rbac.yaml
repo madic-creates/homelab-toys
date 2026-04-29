@@ -1,0 +1,58 @@
+# ServiceAccount + cluster-wide list on Nodes and cert-manager Certificates,
+# plus a namespaced get on Pods (for the self-pod birthday read at startup).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tamagotchi
+  namespace: tamagotchi
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: tamagotchi-reader
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["list"]
+  - apiGroups: ["cert-manager.io"]
+    resources: ["certificates"]
+    verbs: ["list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tamagotchi-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tamagotchi-reader
+subjects:
+  - kind: ServiceAccount
+    name: tamagotchi
+    namespace: tamagotchi
+---
+# Namespace-scoped: get on the binary's own pod. resourceNames is impractical
+# (pod name is dynamic), so we scope to the namespace instead.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: tamagotchi-self-pod
+  namespace: tamagotchi
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tamagotchi-self-pod
+  namespace: tamagotchi
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: tamagotchi-self-pod
+subjects:
+  - kind: ServiceAccount
+    name: tamagotchi
+    namespace: tamagotchi

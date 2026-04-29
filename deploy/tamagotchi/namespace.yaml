@@ -1,0 +1,8 @@
+# Optional — drop this file if you're reusing an existing namespace and
+# update the metadata.namespace fields in the other manifests accordingly.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tamagotchi
+  labels:
+    app.kubernetes.io/name: tamagotchi
