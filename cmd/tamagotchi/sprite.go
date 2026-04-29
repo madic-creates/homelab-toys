@@ -22,9 +22,9 @@ type moodPalette map[byte]string
 //
 // Layout convention (rough):
 //
-//	rows  0–6: empty (room for the confused "?" overlay)
-//	rows  7–14: ear/antenna line
-//	rows 15–46: head (round-ish 32×32 in the centre)
+//	rows  0–6:  empty (room for the confused "?" overlay)
+//	rows  7–14: reserved for future ear/antenna (currently empty)
+//	rows 15–46: head (round-ish, centred on the canvas)
 //	rows 47–58: body
 //	rows 59–63: feet
 //
@@ -113,8 +113,9 @@ func mehMatrix() moodMatrix {
 
 func sickMatrix() moodMatrix {
 	m := baseRoundShape("frown")
-	// Add a downward droop to eye rows (rows 24–26, cols 22 and 42 use palette index 3).
-	for _, y := range []int{24, 25, 26} {
+	// Recolor all eye-pixel rows (23–25, matching baseRoundShape's eye loop)
+	// to palette index 3 (the droopy-green tint) for the sick look.
+	for _, y := range []int{23, 24, 25} {
 		row := []byte(m[y])
 		if row[22] == '2' {
 			row[22] = '3'
