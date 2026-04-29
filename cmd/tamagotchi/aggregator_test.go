@@ -3,11 +3,16 @@ package main
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/madic-creates/homelab-toys/internal/argocd"
+	"github.com/madic-creates/homelab-toys/internal/certs"
 	"github.com/madic-creates/homelab-toys/internal/kube"
+	"github.com/madic-creates/homelab-toys/internal/prom"
 )
 
 type fakeMetrics struct {
@@ -133,4 +138,132 @@ func TestMakeNodesPoll_ErrorRecorded(t *testing.T) {
 	if snap.Nodes.LastError == "" {
 		t.Error("LastError not recorded")
 	}
+}
+
+// ---------- MakeArgoCDPoll tests ----------
+
+func TestMakeArgoCDPoll_DegradedAppPenalty1(t *testing.T) {
+	// Internal/argocd flattens metadata.name + status.{sync,health}.status
+	// into the Application{Name, Sync, Health} struct. The HTTP fixture
+	// must therefore use the upstream nested shape.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"items":[
+			{"metadata":{"name":"ok"},"status":{"sync":{"status":"Synced"},"health":{"status":"Healthy"}}},
+			{"metadata":{"name":"bad"},"status":{"sync":{"status":"Synced"},"health":{"status":"Degraded"}}}
+		]}`))
+	}))
+	defer srv.Close()
+	c := argocd.NewClient(srv.URL, "tok", srv.Client())
+
+	st := NewState()
+	now := time.Now()
+	poll := MakeArgoCDPoll(c, st, func() time.Time { return now })
+	if err := poll(context.Background()); err != nil {
+		t.Fatalf("poll: %v", err)
+	}
+	if got := st.Snapshot().ArgoCD.Data; got != 1 {
+		t.Errorf("argocd penalty = %d, want 1", got)
+	}
+}
+
+func TestMakeArgoCDPoll_AllSyncedPenalty0(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"items":[{"metadata":{"name":"ok"},"status":{"sync":{"status":"Synced"},"health":{"status":"Healthy"}}}]}`))
+	}))
+	defer srv.Close()
+	c := argocd.NewClient(srv.URL, "tok", srv.Client())
+	st := NewState()
+	poll := MakeArgoCDPoll(c, st, time.Now)
+	if err := poll(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := st.Snapshot().ArgoCD.Data; got != 0 {
+		t.Errorf("argocd penalty = %d, want 0", got)
+	}
+}
+
+// ---------- MakeLonghornPoll tests ----------
+
+func TestMakeLonghornPoll_DegradedVolumePenalty1(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"status":"success","data":{"resultType":"vector","result":[{"metric":{},"value":[123,"2"]}]}}`))
+	}))
+	defer srv.Close()
+	c := prom.NewClient(srv.URL, srv.Client())
+	st := NewState()
+	poll := MakeLonghornPoll(c, st, time.Now)
+	if err := poll(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := st.Snapshot().Longhorn.Data; got != 1 {
+		t.Errorf("longhorn penalty = %d, want 1", got)
+	}
+}
+
+// ---------- MakeRestartsPoll tests ----------
+
+func TestMakeRestartsPoll_CapAt2(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"status":"success","data":{"resultType":"vector","result":[{"metric":{},"value":[123,"7"]}]}}`))
+	}))
+	defer srv.Close()
+	c := prom.NewClient(srv.URL, srv.Client())
+	st := NewState()
+	poll := MakeRestartsPoll(c, st, time.Now)
+	if err := poll(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := st.Snapshot().Restarts.Data; got != 2 {
+		t.Errorf("restarts penalty = %d, want 2 (capped)", got)
+	}
+}
+
+// ---------- MakeCertsPoll tests ----------
+
+func TestMakeCertsPoll_ExpiringPenalty1(t *testing.T) {
+	now := time.Date(2026, 4, 28, 12, 0, 0, 0, time.UTC)
+	lister := &stubCertsLister{
+		expiring: []certs.Cert{
+			{Namespace: "ns", Name: "soon", NotAfter: now.Add(7 * 24 * time.Hour)},
+		},
+	}
+	st := NewState()
+	poll := MakeCertsPoll(lister, st, func() time.Time { return now })
+	if err := poll(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := st.Snapshot().Certs.Data; got != 1 {
+		t.Errorf("certs penalty = %d, want 1", got)
+	}
+}
+
+func TestMakeCertsPoll_NothingExpiringPenalty0(t *testing.T) {
+	st := NewState()
+	poll := MakeCertsPoll(&stubCertsLister{}, st, time.Now)
+	if err := poll(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := st.Snapshot().Certs.Data; got != 0 {
+		t.Errorf("certs penalty = %d, want 0", got)
+	}
+}
+
+// stubCertsLister returns the configured `expiring` slice without any
+// filtering — this stub stands in for the already-filtering ExpiringSoon
+// implementation. To test "filtering happens before the poll sees the
+// list", that's a concern of internal/certs/lister_test.go, not here.
+type stubCertsLister struct {
+	expiring []certs.Cert
+	err      error
+}
+
+func (s *stubCertsLister) ExpiringSoon(_ context.Context, _ time.Time, _ time.Duration) ([]certs.Cert, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.expiring, nil
 }
