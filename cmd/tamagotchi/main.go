@@ -155,6 +155,10 @@ func run() error {
 	case <-ctx.Done():
 	case err := <-listenErr:
 		slog.Error("listener", "error", err)
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), shutdownGracePeriod)
+		defer shutdownCancel()
+		_ = srv.Shutdown(shutdownCtx)
+		return err
 	}
 
 	slog.Info("shutting down")
