@@ -119,15 +119,15 @@ func (h *Handlers) Widget(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (h *Handlers) renderPage(w http.ResponseWriter, name string) {
-	start := h.now()
+	now := h.now()
 	defer func() {
-		h.renderDuration.Observe(time.Since(start).Seconds())
+		h.renderDuration.Observe(time.Since(now).Seconds())
 	}()
 	snap := h.state.Snapshot()
 	data := pageData{
 		Mood:     snap.Mood.Name(),
 		Level:    snap.Mood.Level,
-		AgeDays:  ageInDays(snap.Birthday, h.now()),
+		AgeDays:  ageInDays(snap.Birthday, now),
 		Sprite:   template.HTML(RenderSprite(snap.Mood.Name(), snap.Confused)), //nolint:gosec // RenderSprite produces controlled SVG markup
 		Hello:    !snap.HasFirstTick,
 		Confused: snap.Confused,
