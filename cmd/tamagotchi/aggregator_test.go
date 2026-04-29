@@ -267,3 +267,72 @@ func (s *stubCertsLister) ExpiringSoon(_ context.Context, _ time.Time, _ time.Du
 	}
 	return s.expiring, nil
 }
+
+func TestMakeArgoCDPoll_ErrorRecorded(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+	c := argocd.NewClient(srv.URL, "tok", srv.Client())
+
+	st := NewState()
+	now := time.Now()
+	poll := MakeArgoCDPoll(c, st, func() time.Time { return now })
+	if err := poll(context.Background()); err == nil {
+		t.Fatal("want error from poll, got nil")
+	}
+	snap := st.Snapshot()
+	if snap.ArgoCD.LastError == "" {
+		t.Error("ArgoCD LastError not recorded")
+	}
+}
+
+func TestMakeLonghornPoll_ErrorRecorded(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+	}))
+	defer srv.Close()
+	c := prom.NewClient(srv.URL, srv.Client())
+
+	st := NewState()
+	now := time.Now()
+	poll := MakeLonghornPoll(c, st, func() time.Time { return now })
+	if err := poll(context.Background()); err == nil {
+		t.Fatal("want error from poll, got nil")
+	}
+	snap := st.Snapshot()
+	if snap.Longhorn.LastError == "" {
+		t.Error("Longhorn LastError not recorded")
+	}
+}
+
+func TestMakeRestartsPoll_ErrorRecorded(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+	}))
+	defer srv.Close()
+	c := prom.NewClient(srv.URL, srv.Client())
+
+	st := NewState()
+	now := time.Now()
+	poll := MakeRestartsPoll(c, st, func() time.Time { return now })
+	if err := poll(context.Background()); err == nil {
+		t.Fatal("want error from poll, got nil")
+	}
+	snap := st.Snapshot()
+	if snap.Restarts.LastError == "" {
+		t.Error("Restarts LastError not recorded")
+	}
+}
+
+func TestMakeCertsPoll_ErrorRecorded(t *testing.T) {
+	st := NewState()
+	now := time.Now()
+	poll := MakeCertsPoll(&stubCertsLister{err: errors.New("kube down")}, st, func() time.Time { return now })
+	if err := poll(context.Background()); err == nil {
+		t.Fatal("want error from poll, got nil")
+	}
+	if st.Snapshot().Certs.LastError == "" {
+		t.Error("Certs LastError not recorded")
+	}
+}
