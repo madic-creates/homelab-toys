@@ -187,8 +187,9 @@ func (h *Handlers) Healthz(w http.ResponseWriter, _ *http.Request) {
 }
 
 // Metrics returns a Prometheus-handler that serves the four tamagotchi
-// collectors. Caller must invoke this once and mount the returned
-// http.Handler on /metrics.
+// collectors. Each call allocates a fresh registry, so multiple calls
+// are safe but wasteful — typically called once in main() and mounted
+// on /metrics.
 func (h *Handlers) Metrics() http.Handler {
 	r := prometheus.NewRegistry()
 	r.MustRegister(h.pollTotal, h.lastSuccessSecs, h.moodLevel, h.renderDuration)
