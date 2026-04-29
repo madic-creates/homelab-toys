@@ -51,6 +51,9 @@ func runSourceWithBackoff(ctx context.Context, name string, poll pollFunc, inter
 				}
 			}
 		}()
+		// The goroutine returned because of either ctx-cancel (we exit
+		// the outer loop on the next iteration) or a recovered panic (we
+		// sleep and retry).
 		if ctx.Err() != nil {
 			return
 		}
