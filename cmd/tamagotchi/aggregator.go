@@ -23,11 +23,11 @@ type metricsRecorder interface {
 	LastSuccessSeconds(source string, seconds float64)
 }
 
-const defaultBackoff = 10 * time.Second //nolint:unused // wired by main.go (Task 15)
+const defaultBackoff = 10 * time.Second
 
 // runSource is the production wrapper around runSourceWithBackoff, using
 // the spec's 10-second post-panic backoff.
-func runSource(ctx context.Context, name string, poll pollFunc, interval time.Duration, m metricsRecorder) { //nolint:unused // wired by main.go (Task 15)
+func runSource(ctx context.Context, name string, poll pollFunc, interval time.Duration, m metricsRecorder) {
 	runSourceWithBackoff(ctx, name, poll, interval, defaultBackoff, m)
 }
 
