@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tamagotchi widget</title>
+<style>{{.CSS}}</style>
+</head>
+<body class="widget mood-{{.Mood}}{{if .Confused}} confused{{end}}">
+<div class="sprite-wrap">{{.Sprite}}</div>
+<span class="mood-text">{{.Mood}}</span>
+<script>
+  async function tick() {
+    try {
+      const r = await fetch('/api/state', {cache: 'no-store'});
+      if (!r.ok) return;
+      const j = await r.json();
+      const cls = 'widget mood-' + j.mood + (j.confused ? ' confused' : '');
+      if (document.body.className !== cls) document.body.className = cls;
+      const text = document.querySelector('.mood-text');
+      if (text) text.textContent = j.mood;
+    } catch (e) {}
+  }
+  setInterval(tick, 30000);
+</script>
+</body>
+</html>

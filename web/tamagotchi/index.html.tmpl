@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pod-Tamagotchi</title>
+<style>{{.CSS}}</style>
+</head>
+<body class="mood-{{.Mood}}{{if .Confused}} confused{{end}}">
+<main class="stage">
+  <div class="sprite-wrap">{{.Sprite}}</div>
+  <p class="mood-text">{{.Mood}}</p>
+  {{if .Hello}}<div class="hallo">Hallo!</div>{{end}}
+  <p class="age">Age: {{.AgeDays}} day(s)</p>
+  {{if .Stale}}<p class="stale">Stale: {{range $i, $s := .Stale}}{{if $i}}, {{end}}{{$s}}{{end}}</p>{{end}}
+</main>
+<script>
+  async function tick() {
+    try {
+      const r = await fetch('/api/state', {cache: 'no-store'});
+      if (!r.ok) return;
+      const j = await r.json();
+      const cls = 'mood-' + j.mood + (j.confused ? ' confused' : '');
+      if (document.body.className !== cls) document.body.className = cls;
+      const text = document.querySelector('.mood-text');
+      if (text) text.textContent = j.mood;
+      const age = document.querySelector('.age');
+      if (age) age.textContent = 'Age: ' + j.age_days + ' day(s)';
+    } catch (e) { /* swallow — next tick */ }
+  }
+  setInterval(tick, 30000);
+</script>
+</body>
+</html>
