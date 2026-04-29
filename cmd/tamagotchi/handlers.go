@@ -97,6 +97,49 @@ func (h *Handlers) APIState(w http.ResponseWriter, _ *http.Request) {
 	}
 }
 
+type pageData struct {
+	Mood     string
+	Level    int
+	AgeDays  int
+	Sprite   template.HTML
+	Hello    bool
+	Confused bool
+	Stale    []string
+	CSS      template.CSS
+}
+
+// Index serves the fullscreen page. The template name is "index".
+func (h *Handlers) Index(w http.ResponseWriter, _ *http.Request) {
+	h.renderPage(w, "index")
+}
+
+// Widget serves the compact widget page. The template name is "widget".
+func (h *Handlers) Widget(w http.ResponseWriter, _ *http.Request) {
+	h.renderPage(w, "widget")
+}
+
+func (h *Handlers) renderPage(w http.ResponseWriter, name string) {
+	start := h.now()
+	defer func() {
+		h.renderDuration.Observe(time.Since(start).Seconds())
+	}()
+	snap := h.state.Snapshot()
+	data := pageData{
+		Mood:     snap.Mood.Name(),
+		Level:    snap.Mood.Level,
+		AgeDays:  ageInDays(snap.Birthday, h.now()),
+		Sprite:   template.HTML(RenderSprite(snap.Mood.Name(), snap.Confused)), //nolint:gosec // RenderSprite produces controlled SVG markup
+		Hello:    !snap.HasFirstTick,
+		Confused: snap.Confused,
+		Stale:    snap.StaleSources,
+		CSS:      h.cssPayload,
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := h.tpl.ExecuteTemplate(w, name, data); err != nil {
+		slog.Warn("render template", "name", name, "error", err)
+	}
+}
+
 func ageInDays(birthday, now time.Time) int {
 	if birthday.IsZero() {
 		return 0

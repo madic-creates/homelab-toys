@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"html/template"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -73,5 +74,55 @@ func TestAPIState_HelloWhileNotYetTicked(t *testing.T) {
 	}
 	if got.Mood != "happy" {
 		t.Errorf("init mood = %q, want happy", got.Mood)
+	}
+}
+
+func TestIndex_RendersSpriteAndMoodClass(t *testing.T) {
+	tpl := template.Must(template.New("index").Parse(`<body class="mood-{{.Mood}}">{{.Sprite}}</body>`))
+	st := NewState()
+	now := time.Date(2026, 4, 28, 12, 0, 0, 0, time.UTC)
+	st.SetArgoCD(0, now)
+	st.SetLonghorn(0, now)
+	st.SetCerts(0, now)
+	st.SetRestarts(0, now)
+	st.SetNodes(0, now)
+	st.UpdateMood(now)
+
+	h := NewHandlers(st, tpl, func() time.Time { return now })
+	rec := httptest.NewRecorder()
+	h.Index(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+
+	body := rec.Body.String()
+	if !strings.Contains(body, `class="mood-ecstatic"`) {
+		t.Errorf("body missing mood class: %s", body)
+	}
+	if !strings.Contains(body, `<svg class="sprite mood-ecstatic"`) {
+		t.Errorf("body missing sprite: %s", body)
+	}
+}
+
+func TestWidget_RendersSpriteAndMoodText(t *testing.T) {
+	tpl := template.Must(template.New("widget").Parse(`<body>{{.Sprite}}<span>{{.Mood}}</span></body>`))
+	st := NewState()
+	now := time.Date(2026, 4, 28, 12, 0, 0, 0, time.UTC)
+	st.SetArgoCD(0, now)
+	st.SetLonghorn(0, now)
+	st.SetCerts(0, now)
+	st.SetRestarts(0, now)
+	st.SetNodes(3, now) // node down → dying
+	st.UpdateMood(now)
+
+	h := NewHandlers(st, tpl, func() time.Time { return now })
+	rec := httptest.NewRecorder()
+	h.Widget(rec, httptest.NewRequest(http.MethodGet, "/widget", nil))
+
+	body := rec.Body.String()
+	// Note: penalty 3 + clamp gives Mood.Level=3 (sick), not 4 (dying).
+	// Use "sick" in assertions.
+	if !strings.Contains(body, `<svg class="sprite mood-sick"`) {
+		t.Errorf("widget missing sprite: %s", body)
+	}
+	if !strings.Contains(body, ">sick</span>") {
+		t.Errorf("widget missing mood text: %s", body)
 	}
 }
