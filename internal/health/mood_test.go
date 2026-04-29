@@ -287,3 +287,21 @@ func equalStrings(a, b []string) bool {
 	}
 	return true
 }
+
+func TestCompute_StaleSourcesBoundary(t *testing.T) {
+	t0 := time.Date(2026, 4, 28, 12, 0, 0, 0, time.UTC)
+	// Exactly at the staleness window — must be fresh for penalty AND
+	// absent from StaleSources. Locks in the `>` semantics in
+	// classifySources, symmetric with isFresh's `<=`.
+	s := Sources{
+		ArgoCD:   Source{Loaded: true, LastSuccess: t0.Add(-5 * time.Minute), Penalty: 1},
+		Longhorn: Source{Loaded: true, LastSuccess: t0, Penalty: 0},
+		Certs:    Source{Loaded: true, LastSuccess: t0, Penalty: 0},
+		Restarts: Source{Loaded: true, LastSuccess: t0, Penalty: 0},
+		Nodes:    Source{Loaded: true, LastSuccess: t0, Penalty: 0},
+	}
+	r := Compute(s, History{Current: Mood{Level: 0}, FirstSuccess: &t0}, t0)
+	if len(r.StaleSources) != 0 {
+		t.Errorf("StaleSources = %v, want empty at exact boundary", r.StaleSources)
+	}
+}

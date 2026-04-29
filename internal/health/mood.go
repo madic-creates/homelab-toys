@@ -114,9 +114,11 @@ const improvementHold = 5 * time.Minute
 func Compute(s Sources, h History, now time.Time) Result {
 	stale, anyLoaded := classifySources(s, now)
 
-	// Init grace: no source has ever been Loaded yet — show happy and
-	// skip the algorithm entirely. The handler displays "Hallo!" while
-	// FirstSuccess remains nil.
+	// Init grace: no source is currently Loaded in this snapshot — show
+	// happy and skip the algorithm entirely. During normal startup,
+	// FirstSuccess will also be nil; if all sources simultaneously go
+	// unloaded again after first success, happy is still the right
+	// fallback rather than driving the pet to dying.
 	if !anyLoaded {
 		h.Current = Mood{Level: 1}
 		return Result{History: h, Current: h.Current, StaleSources: stale, Confused: len(stale) >= 2}
@@ -128,7 +130,7 @@ func Compute(s Sources, h History, now time.Time) Result {
 	// First successful tick — adopt the computed level immediately,
 	// bypassing the hysteresis improvement window.
 	if h.FirstSuccess == nil {
-		now := now // pin
+		now := now // local copy so &now is owned by the closure-free code path; never aliases the parameter
 		h.FirstSuccess = &now
 		h.Current = next
 		h.Pending = nil
