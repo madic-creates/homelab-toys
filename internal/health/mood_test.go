@@ -79,6 +79,30 @@ func TestSumPenalty_Cases(t *testing.T) {
 			s:    Sources{ArgoCD: fresh(1), Longhorn: fresh(0), Certs: fresh(1), Restarts: fresh(0), Nodes: fresh(0)},
 			want: 2,
 		},
+		{
+			name: "stale source excluded",
+			s: Sources{
+				ArgoCD:   Source{Loaded: true, LastSuccess: now.Add(-6 * time.Minute), Penalty: 3},
+				Longhorn: fresh(0), Certs: fresh(0), Restarts: fresh(0), Nodes: fresh(0),
+			},
+			want: 0,
+		},
+		{
+			name: "unloaded source excluded",
+			s: Sources{
+				ArgoCD:   Source{Loaded: false, Penalty: 3},
+				Longhorn: fresh(0), Certs: fresh(0), Restarts: fresh(0), Nodes: fresh(0),
+			},
+			want: 0,
+		},
+		{
+			name: "exactly at staleness boundary is fresh",
+			s: Sources{
+				ArgoCD:   Source{Loaded: true, LastSuccess: now.Add(-5 * time.Minute), Penalty: 1},
+				Longhorn: fresh(0), Certs: fresh(0), Restarts: fresh(0), Nodes: fresh(0),
+			},
+			want: 1,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
