@@ -56,7 +56,7 @@ func TestState_UpdateMood_RunsCompute(t *testing.T) {
 	s.SetLonghorn(0, now)
 	s.SetCerts(0, now)
 	s.SetRestarts(0, now)
-	s.SetNodes(3, now) // node-down → penalty 3
+	s.SetNodes(3, now) // node-down: penalty 3 → Mood.Level=3 (sick). Task 3's SumPenalty table is authoritative; the plan's Task 7 draft initially said level 4 but the arithmetic (penalty 3 + clamp [0,4]) caps at 3.
 	s.UpdateMood(now)
 
 	snap := s.Snapshot()

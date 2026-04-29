@@ -137,7 +137,14 @@ func (s *State) UpdateMood(now time.Time) {
 	s.history = res.History
 	s.snap.Mood = res.Current
 	s.snap.Confused = res.Confused
-	s.snap.StaleSources = append(s.snap.StaleSources[:0], res.StaleSources...)
+	// Allocate a fresh backing array each tick — at most 5 strings every
+	// 20s, and avoids the hazard of any future RLock-only reader
+	// observing a partial append into a shared underlying array.
+	if len(res.StaleSources) > 0 {
+		s.snap.StaleSources = append([]string(nil), res.StaleSources...)
+	} else {
+		s.snap.StaleSources = nil
+	}
 	s.snap.HasFirstTick = s.history.FirstSuccess != nil
 }
 
