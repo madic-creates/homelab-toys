@@ -14,8 +14,12 @@ body { display: flex; align-items: center; justify-content: center; }
   image-rendering: pixelated;
   image-rendering: crisp-edges;
 }
-.sprite-wrap svg { display: block; transform: scale(8); transform-origin: top left; }
-body.widget .sprite-wrap svg { transform: scale(2); }
+/* The SVG carries width="64" height="64" so the layout box is 64×64. We
+   render at 8x (512×512) for the standalone view and 2x (128×128) for the
+   widget. image-rendering: pixelated on the wrapper keeps each cell crisp.
+   Animations live on the wrapper so they don't fight the SVG sizing. */
+.sprite-wrap svg { display: block; width: 512px; height: 512px; }
+body.widget .sprite-wrap svg { width: 128px; height: 128px; }
 
 .mood-text { font-size: 1.5rem; margin-top: 1rem; text-transform: uppercase; letter-spacing: 0.2em; }
 body.widget .mood-text { font-size: 0.9rem; margin: 0.2rem; }

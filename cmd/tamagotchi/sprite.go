@@ -64,7 +64,11 @@ func RenderSprite(mood string, confused bool) string {
 
 	var b strings.Builder
 	b.Grow(8 * 1024)
-	fmt.Fprintf(&b, `<svg class="sprite mood-%s" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">`, mood)
+	// Explicit width/height attrs are mandatory: without them an inline
+	// SVG with only a viewBox can render at 0×0 inside an inline-block
+	// parent, so transform: scale(8) of zero stays zero — the sprite
+	// disappears even though the markup is correct.
+	fmt.Fprintf(&b, `<svg class="sprite mood-%s" viewBox="0 0 64 64" width="64" height="64" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">`, mood)
 
 	for y, row := range m {
 		for x := 0; x < len(row) && x < spriteSize; x++ {
