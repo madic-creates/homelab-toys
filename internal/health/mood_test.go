@@ -116,7 +116,6 @@ func TestSumPenalty_Cases(t *testing.T) {
 
 func TestCompute_Hysteresis_ImmediateWorsening(t *testing.T) {
 	t0 := time.Date(2026, 4, 28, 12, 0, 0, 0, time.UTC)
-	good := allFresh(t0, 0, 0, 0, 0, 0)
 	bad := allFresh(t0, 0, 0, 0, 0, 3) // node down → +3 → level 3
 	// Start at happy.
 	h := History{Current: Mood{Level: 1}, FirstSuccess: &t0}
@@ -127,7 +126,6 @@ func TestCompute_Hysteresis_ImmediateWorsening(t *testing.T) {
 	if r.History.Pending != nil {
 		t.Errorf("pending must be nil after worsening, got %+v", r.History.Pending)
 	}
-	_ = good
 }
 
 func TestCompute_Hysteresis_ImprovementHeldFor5Minutes(t *testing.T) {

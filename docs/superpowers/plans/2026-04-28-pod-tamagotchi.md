@@ -521,9 +521,15 @@ func TestSumPenalty_Cases(t *testing.T) {
 			want: 2,
 		},
 		{
-			name: "node down forces dying",
+			// Node penalty is +3 per the spec table — alone that lands on
+			// level 3 (sick), not 4 (dying). The spec's parenthetical
+			// "(immediately dying)" is semantic colour: node-down is the
+			// single worst-weighted signal, but it still combines with
+			// others to reach dying. See Task 4's hysteresis test for the
+			// matching expectation.
+			name: "node down reaches sick",
 			s:    Sources{ArgoCD: fresh(0), Longhorn: fresh(0), Certs: fresh(0), Restarts: fresh(0), Nodes: fresh(3)},
-			want: 4,
+			want: 3,
 		},
 		{
 			name: "all bad clamps at 4",

@@ -134,6 +134,12 @@ func Compute(s Sources, h History, now time.Time) Result {
 			// Window has elapsed at the same target — apply.
 			h.Current = h.Pending.Target
 			h.Pending = nil
+		default:
+			// Window still open at the same target — defensively copy
+			// the Pending pointer so callers can't accidentally mutate
+			// the input's heap allocation through r.History.Pending.
+			p := *h.Pending
+			h.Pending = &p
 		}
 	default:
 		// Stable — discard any pending improvement (it's no longer needed).
