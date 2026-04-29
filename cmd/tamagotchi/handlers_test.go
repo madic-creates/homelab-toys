@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -50,6 +51,11 @@ func TestAPIState_HappyPath(t *testing.T) {
 	if got.Hello {
 		t.Errorf("Hello should be false after first tick")
 	}
+	// Lock in the [] vs null normalization — apiStateResponse would
+	// happily decode either, so we have to check the raw body.
+	if !strings.Contains(rec.Body.String(), `"stale_sources":[]`) {
+		t.Errorf("stale_sources should serialise as []; body = %s", rec.Body.String())
+	}
 }
 
 func TestAPIState_HelloWhileNotYetTicked(t *testing.T) {
@@ -61,7 +67,7 @@ func TestAPIState_HelloWhileNotYetTicked(t *testing.T) {
 	h.APIState(rec, httptest.NewRequest(http.MethodGet, "/api/state", nil))
 
 	var got apiStateResponse
-	json.Unmarshal(rec.Body.Bytes(), &got) //nolint:errcheck
+	json.Unmarshal(rec.Body.Bytes(), &got) //nolint:errcheck // body is handler-produced JSON; parse failure would surface as zero-value mood/hello below
 	if !got.Hello {
 		t.Errorf("Hello = false, want true during init grace")
 	}
