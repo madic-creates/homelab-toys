@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // Handlers wires HTTP endpoints to the shared State + templates.
@@ -183,4 +184,13 @@ func (h *Handlers) Healthz(w http.ResponseWriter, _ *http.Request) {
 		}
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+// Metrics returns a Prometheus-handler that serves the four tamagotchi
+// collectors. Caller must invoke this once and mount the returned
+// http.Handler on /metrics.
+func (h *Handlers) Metrics() http.Handler {
+	r := prometheus.NewRegistry()
+	r.MustRegister(h.pollTotal, h.lastSuccessSecs, h.moodLevel, h.renderDuration)
+	return promhttp.HandlerFor(r, promhttp.HandlerOpts{})
 }

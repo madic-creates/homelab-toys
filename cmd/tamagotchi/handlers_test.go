@@ -171,3 +171,15 @@ func TestHealthz_InitGraceOK(t *testing.T) {
 		t.Fatalf("init grace status = %d, want 200", rec.Code)
 	}
 }
+
+func TestMetrics_ServesPrometheusFormat(t *testing.T) {
+	st := NewState()
+	h := NewHandlers(st, nil, time.Now)
+	h.PollTotal("argocd", "success") // produce one sample
+	rec := httptest.NewRecorder()
+	h.Metrics().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+	body := rec.Body.String()
+	if !strings.Contains(body, `tamagotchi_source_poll_total{result="success",source="argocd"} 1`) {
+		t.Errorf("metric body missing counter line: %s", body)
+	}
+}
