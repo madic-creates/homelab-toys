@@ -110,28 +110,41 @@ type Result struct {
 const improvementHold = 5 * time.Minute
 
 // Compute applies the spec's mood algorithm to the given Sources, threading
-// History across ticks. The function is pure — all time inputs come via
-// `now` — so tests can drive it deterministically without a Clock interface.
+// History across ticks. Pure function — all time inputs come via `now`.
 func Compute(s Sources, h History, now time.Time) Result {
-	// Init grace + staleness reporting are added in Task 5; this task
-	// implements the hysteresis state machine over fresh, loaded sources.
+	stale, anyLoaded := classifySources(s, now)
+
+	// Init grace: no source has ever been Loaded yet — show happy and
+	// skip the algorithm entirely. The handler displays "Hallo!" while
+	// FirstSuccess remains nil.
+	if !anyLoaded {
+		h.Current = Mood{Level: 1}
+		return Result{History: h, Current: h.Current, StaleSources: stale, Confused: len(stale) >= 2}
+	}
 
 	level := SumPenalty(s, now)
 	next := Mood{Level: level}
 
+	// First successful tick — adopt the computed level immediately,
+	// bypassing the hysteresis improvement window.
+	if h.FirstSuccess == nil {
+		now := now // pin
+		h.FirstSuccess = &now
+		h.Current = next
+		h.Pending = nil
+		return Result{History: h, Current: h.Current, StaleSources: stale, Confused: len(stale) >= 2}
+	}
+
+	// Standard hysteresis state machine.
 	switch {
 	case next.Level > h.Current.Level:
-		// Worsening — single-step jump, discard any pending improvement.
 		h.Current = next
 		h.Pending = nil
 	case next.Level < h.Current.Level:
-		// Improvement candidate.
 		switch {
 		case h.Pending == nil || h.Pending.Target.Level != next.Level:
-			// New candidate or target shift — (re)start the window.
 			h.Pending = &Pending{Target: next, Since: now}
 		case now.Sub(h.Pending.Since) >= improvementHold:
-			// Window has elapsed at the same target — apply.
 			h.Current = h.Pending.Target
 			h.Pending = nil
 		default:
@@ -142,9 +155,38 @@ func Compute(s Sources, h History, now time.Time) Result {
 			h.Pending = &p
 		}
 	default:
-		// Stable — discard any pending improvement (it's no longer needed).
 		h.Pending = nil
 	}
 
-	return Result{History: h, Current: h.Current}
+	return Result{History: h, Current: h.Current, StaleSources: stale, Confused: len(stale) >= 2}
+}
+
+// classifySources returns the names of stale sources (Loaded but older
+// than stalenessWindow) plus a flag set to true if any source is Loaded
+// at all (used to detect the init-grace boundary).
+//
+// Order is fixed (argocd, longhorn, certs, restarts, nodes) so the slice
+// is stable across calls — the JSON handler and tests both rely on this.
+func classifySources(s Sources, now time.Time) ([]string, bool) {
+	var stale []string
+	anyLoaded := false
+	type ent struct {
+		name string
+		src  Source
+	}
+	for _, e := range []ent{
+		{"argocd", s.ArgoCD},
+		{"longhorn", s.Longhorn},
+		{"certs", s.Certs},
+		{"restarts", s.Restarts},
+		{"nodes", s.Nodes},
+	} {
+		if e.src.Loaded {
+			anyLoaded = true
+			if now.Sub(e.src.LastSuccess) > stalenessWindow {
+				stale = append(stale, e.name)
+			}
+		}
+	}
+	return stale, anyLoaded
 }

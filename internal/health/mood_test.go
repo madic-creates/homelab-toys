@@ -206,3 +206,84 @@ func allFresh(now time.Time, a, l, c, r, n int) Sources {
 	mk := func(p int) Source { return Source{Loaded: true, LastSuccess: now, Penalty: p} }
 	return Sources{ArgoCD: mk(a), Longhorn: mk(l), Certs: mk(c), Restarts: mk(r), Nodes: mk(n)}
 }
+
+func TestCompute_InitGrace_NoSourcesYet(t *testing.T) {
+	t0 := time.Date(2026, 4, 28, 12, 0, 0, 0, time.UTC)
+	s := Sources{} // nothing Loaded
+	r := Compute(s, History{}, t0)
+	if r.Current.Level != 1 {
+		t.Fatalf("init current = %d, want 1 (happy)", r.Current.Level)
+	}
+	if r.History.FirstSuccess != nil {
+		t.Errorf("FirstSuccess should still be nil, got %v", *r.History.FirstSuccess)
+	}
+}
+
+func TestCompute_InitGrace_FirstSuccessAdoptsComputedLevel(t *testing.T) {
+	t0 := time.Date(2026, 4, 28, 12, 0, 0, 0, time.UTC)
+	// Bad data on first poll (level 3) — adopt immediately, no 5-min wait.
+	bad := allFresh(t0, 0, 0, 0, 0, 3)
+	r := Compute(bad, History{}, t0)
+	if r.Current.Level != 3 {
+		t.Fatalf("first success current = %d, want 3 (immediate adopt)", r.Current.Level)
+	}
+	if r.History.FirstSuccess == nil || !r.History.FirstSuccess.Equal(t0) {
+		t.Fatalf("FirstSuccess = %v, want set to %v", r.History.FirstSuccess, t0)
+	}
+}
+
+func TestCompute_StaleSourcesReported(t *testing.T) {
+	t0 := time.Date(2026, 4, 28, 12, 0, 0, 0, time.UTC)
+	old := t0.Add(-10 * time.Minute) // > stalenessWindow
+	s := Sources{
+		ArgoCD:   Source{Loaded: true, LastSuccess: old, Penalty: 1},
+		Longhorn: Source{Loaded: true, LastSuccess: t0, Penalty: 0},
+		Certs:    Source{Loaded: true, LastSuccess: t0, Penalty: 0},
+		Restarts: Source{Loaded: true, LastSuccess: t0, Penalty: 0},
+		Nodes:    Source{Loaded: true, LastSuccess: t0, Penalty: 0},
+	}
+	r := Compute(s, History{Current: Mood{Level: 1}, FirstSuccess: &t0}, t0)
+	if got := r.StaleSources; len(got) != 1 || got[0] != "argocd" {
+		t.Errorf("StaleSources = %v, want [argocd]", got)
+	}
+	if r.Confused {
+		t.Errorf("Confused = true, want false (only 1 stale)")
+	}
+	// Stale source's penalty must not contribute.
+	if r.Current.Level != 1 {
+		// Hysteresis: from happy with all-zero fresh signals → improvement window starts, current stays at 1.
+		// This is the right behaviour; stale ArgoCD's penalty=1 is excluded.
+		t.Errorf("Current.Level = %d, want still 1 (stale penalty excluded)", r.Current.Level)
+	}
+}
+
+func TestCompute_TwoStaleSourcesConfused(t *testing.T) {
+	t0 := time.Date(2026, 4, 28, 12, 0, 0, 0, time.UTC)
+	old := t0.Add(-10 * time.Minute)
+	s := Sources{
+		ArgoCD:   Source{Loaded: true, LastSuccess: old},
+		Longhorn: Source{Loaded: true, LastSuccess: old},
+		Certs:    Source{Loaded: true, LastSuccess: t0},
+		Restarts: Source{Loaded: true, LastSuccess: t0},
+		Nodes:    Source{Loaded: true, LastSuccess: t0},
+	}
+	r := Compute(s, History{Current: Mood{Level: 0}, FirstSuccess: &t0}, t0)
+	if !r.Confused {
+		t.Fatalf("Confused = false, want true (2 stale)")
+	}
+	if want := []string{"argocd", "longhorn"}; !equalStrings(r.StaleSources, want) {
+		t.Errorf("StaleSources = %v, want %v", r.StaleSources, want)
+	}
+}
+
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
