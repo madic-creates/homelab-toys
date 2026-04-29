@@ -32,10 +32,14 @@ with `docs/<tool>-deployment.md` as the narrative companion.
 | Build one binary | `go build ./cmd/cluster-tv/` |
 | Pre-commit setup | `pre-commit install` (the hook chain runs golangci-lint + `go test`; the golangci-lint hook tries `$(command -v golangci-lint)` first, falls back to `/go/bin/golangci-lint`) |
 
-CI on push to `main` (`.github/workflows/release.yaml`) runs the same `go vet`
-+ `go test -race` + `golangci-lint` chain, then builds and pushes
-`ghcr.io/madic-creates/<binary>:{latest,<short-sha>}` via a per-binary matrix
-job.
+CI on push to `main` runs one workflow per binary
+(`.github/workflows/release-<binary>.yaml`), each with its own `go vet` +
+`go test -race` + `golangci-lint` + build chain pushing
+`ghcr.io/madic-creates/<binary>:{latest,<short-sha>}`. Each workflow is
+path-filtered to its own `cmd/<binary>/`, `web/<binary>/`,
+`Dockerfile.<binary>`, plus the shared `internal/`, `go.mod`, `go.sum` —
+so a binary-only change rebuilds only that image, while an `internal/`
+change triggers both pipelines.
 
 ## Architecture
 

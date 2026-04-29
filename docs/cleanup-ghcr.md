@@ -4,14 +4,17 @@ This repository publishes container images to `ghcr.io` on every push to
 `main`:
 
 - `ghcr.io/<owner>/cluster-tv`
+- `ghcr.io/<owner>/tamagotchi`
 
-Every build produces a fresh short-SHA tag plus an updated `latest` alias (see
-[`release.yaml`](../.github/workflows/release.yaml)). Without pruning, the tag
-list grows forever. The `cleanup-ghcr.yaml` workflow trims it back.
+Each binary has its own release workflow
+([`release-cluster-tv.yaml`](../.github/workflows/release-cluster-tv.yaml),
+[`release-tamagotchi.yaml`](../.github/workflows/release-tamagotchi.yaml));
+every build produces a fresh short-SHA tag plus an updated `latest` alias.
+Without pruning, the tag list grows forever. The `cleanup-ghcr.yaml`
+workflow trims it back.
 
-When additional binaries land (the planned `tamagotchi` companion), add them to
-the workflow's `matrix.package` list — the rest of the workflow is package-name
-agnostic.
+When additional binaries land, add them to the workflow's `matrix.package`
+list — the rest of the workflow is package-name agnostic.
 
 - Workflow: [`.github/workflows/cleanup-ghcr.yaml`](../.github/workflows/cleanup-ghcr.yaml)
 
